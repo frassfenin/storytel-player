@@ -5,11 +5,12 @@ import {BookShelfEntity} from "../interfaces/books";
 import LoadingState from './LoadingState';
 import ErrorState from './ErrorState';
 import Navbar from './Navbar';
-import {truncateTitle} from '../utils/helpers';
+import {buildCoverUrl, localizedLanguageName, truncateTitle} from '../utils/helpers';
+import api from '../utils/api';
 import "../types/window.d.ts";
 
 function BookView() {
-    const {t} = useTranslation();
+    const {t, i18n} = useTranslation();
     const {bookId} = useParams();
     const location = useLocation();
     const navigate = useNavigate();
@@ -20,6 +21,11 @@ function BookView() {
 
     const book: BookShelfEntity = location.state?.book;
 
+    // description and language are not part of the bookshelf payload; they come
+    // from the per-book book-details endpoint, fetched lazily below.
+    const [description, setDescription] = useState('');
+    const [language, setLanguage] = useState('');
+
     useEffect(() => {
         if (book) {
             document.title = truncateTitle(book.book.name);
@@ -29,6 +35,26 @@ function BookView() {
             document.title = 'Storytel Player';
         };
     }, [book]);
+
+    // Fetch description and language from the book-details endpoint.
+    useEffect(() => {
+        const consumableId = book?.book?.consumableId;
+        if (!consumableId) return;
+        let cancelled = false;
+        api.get(`/book-details/${consumableId}`)
+            .then((res) => {
+                if (cancelled) return;
+                const data = res.data || {};
+                setDescription(data.description || '');
+                setLanguage(localizedLanguageName(data.language, i18n.language));
+            })
+            .catch(() => {
+                /* keep empty fallbacks on failure */
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [book, i18n.language]);
 
     const handlePlayBook = () => {
         navigate(`/player/${bookId}`, {state: {book}});
@@ -53,7 +79,6 @@ function BookView() {
     };
 
     const getTruncatedDescription = () => {
-        const description = book.abook.description || '';
         if (!description) return t('bookView.noDescription');
 
         if (description.length <= 250 || showFullDescription) {
@@ -64,7 +89,6 @@ function BookView() {
     };
 
     const shouldShowMoreButton = () => {
-        const description = book.abook.description || '';
         return description.length > 250;
     };
 
@@ -80,7 +104,7 @@ function BookView() {
                     {/* Book Cover */}
                     <div className="mb-6">
                         <img
-                            src={"https://www.storytel.com" + (book.book.largeCover || book.book.largeCoverE)}
+                            src={buildCoverUrl(book.book.largeCover || book.book.largeCoverE)}
                             alt={book.book.name}
                             className="w-64 h-64 object-cover rounded-lg shadow-2xl"
                         />
@@ -126,7 +150,7 @@ function BookView() {
                     <div className="w-full max-w-md space-y-2 text-sm">
                         <div className="flex justify-between py-2 border-b border-gray-800">
                             <span className="text-gray-400">{t('bookView.language')}</span>
-                            <span className="text-white">{book.book.language.localizedName}</span>
+                            <span className="text-white">{language}</span>
                         </div>
                         <div className="flex justify-between py-2 border-b border-gray-800">
                             <span className="text-gray-400">{t('bookView.duration')}</span>

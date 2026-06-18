@@ -445,6 +445,25 @@ fastify.get<{
 
 
 
+fastify.get<{
+  Params: { consumableId: string };
+}>(
+  "/api/book-details/:consumableId",
+  {
+    preHandler: fastify.authenticate,
+  },
+  async (request, reply) => {
+    try {
+      const { consumableId } = request.params;
+      const storytelClient = hydrateStorytelClient(request.user);
+      const details = await storytelClient.getBookDetails(consumableId);
+      reply.send(details);
+    } catch (error: any) {
+      replyError(reply, error);
+    }
+  },
+);
+
 // Route per controllare stato autenticazione
 fastify.get("/api/auth/status", async (request, reply) => {
   try {
