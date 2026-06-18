@@ -473,6 +473,33 @@ class StorytelClient {
     }
   }
 
+  // New api.storytel.net audio endpoint. Returns a 302 redirect to a signed
+  // mp3 URL on the CDN. Keyed by consumableId (not the abook/program id).
+  async getAudioStreamUrl(consumableId: string): Promise<string> {
+    const url = `https://api.storytel.net/assets/v2/consumables/${consumableId}/abook`;
+
+    try {
+      const bearer = await this.getApiBearer();
+      const response = await this.client.get(url, {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          Accept: "*/*",
+        },
+      });
+      // maxRedirects is 0 on the client, so a 2xx here is unexpected; prefer
+      // the redirect Location captured below in the catch.
+      return (
+        (response.request as any)?.res?.responseUrl ||
+        response.headers.location
+      );
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      const location = error.response?.headers?.location;
+      if (location) return location;
+      throw new Error(`Failed to get audio stream URL: ${error.message}`);
+    }
+  }
+
   async getStreamUrl(bookId: string): Promise<string> {
     const url = `https://www.storytel.com/mp3streamRangeReq?startposition=0&programId=${bookId}&token=${encodeURIComponent(this.getLegacyActionToken())}`;
 
