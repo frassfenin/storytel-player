@@ -24,6 +24,8 @@ defaults:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       ref: ${{ steps.meta.outputs.ref }}
       tag: ${{ steps.meta.outputs.tag }}
@@ -48,6 +50,30 @@ jobs:
           # electron-builder derives its release tag from package.json version (v<version>),
           # so we strip the leading "v" to feed it back in during the build step.
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Create the pre-release up front
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          # The build matrix runs in parallel and each electron-builder invocation
+          # would otherwise try to create the release itself, racing into a 422
+          # "already_exists" on the tag. Creating it once here means every build job
+          # just uploads its assets to an existing release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, reusing it."
+          else
+            gh release create "$TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --notes "Automated pre-release build."
+          fi
 
   build:
     needs: prepare
