@@ -381,7 +381,7 @@ function PlayerView() {
                             newBookmarkNote={bookmarks.newBookmarkNote}
                             currentTime={audioPlayer.currentTime}
                             playbackRate={playbackRate}
-                            onCloseCreateBookmarkModal={() => bookmarks.setShowBookmarksModal(false)}
+                            onCloseCreateBookmarkModal={bookmarks.handleCloseCreateBookmarkModal}
                             onNewBookmarkNoteChange={bookmarks.setNewBookmarkNote}
                             onCreateBookmark={() => bookmarks.createBookmark(audioPlayer.currentTime)}
                             showEditBookmarkModal={bookmarks.showEditBookmarkModal}

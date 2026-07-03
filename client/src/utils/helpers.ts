@@ -1,3 +1,23 @@
+// Build a usable cover URL. The new bookshelf API returns absolute URLs
+// (https://covers.storytel.com/...); the legacy API returned relative paths
+// that needed the www.storytel.com host prepended. Storytel only serves the
+// 640px variant, so there is no smaller size to request.
+export const buildCoverUrl = (cover?: string | null): string => {
+    if (!cover) return '';
+    return /^https?:\/\//.test(cover) ? cover : `https://www.storytel.com${cover}`;
+};
+
+// Turn an ISO language code (e.g. "de") into a name localized in the given UI
+// locale (e.g. "Deutsch"/"Tedesco"). Falls back to the raw code if unsupported.
+export const localizedLanguageName = (code?: string | null, uiLocale = 'en'): string => {
+    if (!code) return '';
+    try {
+        return new Intl.DisplayNames([uiLocale], {type: 'language'}).of(code) || code;
+    } catch {
+        return code;
+    }
+};
+
 export const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);

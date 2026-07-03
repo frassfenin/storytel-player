@@ -215,7 +215,7 @@ fastify.get(
 
 // Route per ottenere stream URL
 fastify.post<{
-  Body: { bookId: string };
+  Body: { bookId: string; consumableId?: string };
 }>(
   "/api/stream",
   {
@@ -223,7 +223,7 @@ fastify.post<{
   },
   async (request, reply) => {
     try {
-      const { bookId } = request.body;
+      const { bookId, consumableId } = request.body;
       const localFilePath = path.join(DOWNLOADS_DIR, `${bookId}.mp3`);
 
       // Check if file exists locally
@@ -254,7 +254,11 @@ fastify.post<{
         }
       } else {
         const storytelClient = hydrateStorytelClient(request.user);
-        const streamUrl = await storytelClient.getStreamUrl(bookId);
+        // Prefer the new api.storytel.net assets endpoint (needs consumableId);
+        // fall back to the legacy programId-based stream if not provided.
+        const streamUrl = consumableId
+          ? await storytelClient.getAudioStreamUrl(consumableId)
+          : await storytelClient.getStreamUrl(bookId);
         reply.send({ streamUrl, remote: true });
       }
     } catch (error: any) {
@@ -444,6 +448,25 @@ fastify.get<{
 );
 
 
+
+fastify.get<{
+  Params: { consumableId: string };
+}>(
+  "/api/book-details/:consumableId",
+  {
+    preHandler: fastify.authenticate,
+  },
+  async (request, reply) => {
+    try {
+      const { consumableId } = request.params;
+      const storytelClient = hydrateStorytelClient(request.user);
+      const details = await storytelClient.getBookDetails(consumableId);
+      reply.send(details);
+    } catch (error: any) {
+      replyError(reply, error);
+    }
+  },
+);
 
 // Route per controllare stato autenticazione
 fastify.get("/api/auth/status", async (request, reply) => {

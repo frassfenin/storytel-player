@@ -1,6 +1,6 @@
 import React from 'react';
 import {useTranslation} from 'react-i18next';
-import {formatTimeNatural} from '../utils/helpers';
+import {buildCoverUrl, formatTimeNatural} from '../utils/helpers';
 import {BookShelfEntity} from '../interfaces/books';
 import {Chapter} from '../interfaces/chapters';
 
@@ -43,7 +43,7 @@ const BookInfo: React.FC<BookInfoProps> = ({
         <div className="flex flex-col items-center">
             <div className="flex flex-col items-center mb-2">
                 <img
-                    src={"https://www.storytel.com" + (book.book.largeCover || book.book.largeCoverE)}
+                    src={buildCoverUrl(book.book.largeCover || book.book.largeCoverE)}
                     alt={book.book.name}
                     className="w-64 h-64 object-cover rounded-lg shadow-2xl mb-4"
                 />

@@ -1,5 +1,5 @@
 import React from 'react';
-import {formatMicrosecondsTime, formatTime} from "../utils/helpers";
+import {buildCoverUrl, formatMicrosecondsTime, formatTime} from "../utils/helpers";
 import {BookShelfEntity} from "../interfaces/books";
 import {useTranslation} from "react-i18next";
 
@@ -28,7 +28,7 @@ function BookCard({book, onBookSelect}: BookCardProps) {
             <div className="flex items-center space-x-4">
                 <div className="flex-shrink-0 flex flex-col">
                     <img
-                        src={"https://www.storytel.com" + (book.book.largeCover || book.book.largeCoverE)}
+                        src={buildCoverUrl(book.book.largeCover || book.book.largeCoverE)}
                         alt={book.book.name}
                         className="w-32 h-32 object-cover rounded-lg shadow-lg mb-2"
                     />
