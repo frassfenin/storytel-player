@@ -63,6 +63,12 @@
     "tooltipEdit": "Modifier le marque-page",
     "tooltipDelete": "Supprimer le marque-page"
   },
+  "errorState": {
+    "title": "Une erreur s'est produite",
+    "tryAgain": "Réessayer",
+    "logoutHint": "Si le problème persiste, déconnectez-vous",
+    "logout": "Se déconnecter"
+  },
   "common": {
     "loading": "Chargement...",
     "error": "Erreur",

@@ -63,6 +63,12 @@
     "tooltipEdit": "Lesezeichen bearbeiten",
     "tooltipDelete": "Lesezeichen löschen"
   },
+  "errorState": {
+    "title": "Etwas ist schiefgelaufen",
+    "tryAgain": "Erneut versuchen",
+    "logoutHint": "Wenn das Problem weiterhin besteht, melde dich ab",
+    "logout": "Abmelden"
+  },
   "common": {
     "loading": "Wird geladen...",
     "error": "Fehler",

@@ -96,7 +96,18 @@ function Dashboard({onLogout, triggerLogout, setTriggerLogout}: DashboardProps) 
     }
 
     if (error) {
-        return <ErrorState error={error} onRetry={() => window.location.reload()}/>;
+        // Keep the header visible on error so the user can always reach
+        // Settings → Logout even when the bookshelf fails to load.
+        return (
+            <div className="min-h-screen bg-black text-white">
+                <DashboardHeader
+                    onLogout={onLogout}
+                    triggerLogout={triggerLogout}
+                    setTriggerLogout={setTriggerLogout}
+                />
+                <ErrorState error={error} onRetry={() => window.location.reload()} onLogout={onLogout}/>
+            </div>
+        );
     }
 
     return (
