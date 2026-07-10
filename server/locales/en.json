@@ -67,6 +67,12 @@
     "tooltipEdit": "Edit bookmark",
     "tooltipDelete": "Delete bookmark"
   },
+  "errorState": {
+    "title": "Something went wrong",
+    "tryAgain": "Try Again",
+    "logoutHint": "If the problem persists, log out",
+    "logout": "Logout"
+  },
   "common": {
     "loading": "Loading...",
     "error": "Error",
