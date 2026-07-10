@@ -1,3 +1,16 @@
+## [1.2.15](https://github.com/debba/storytel-player/compare/v1.2.15-beta1...v1.2.15) (2026-07-10)
+
+
+### Bug Fixes
+
+* **bookmarks:** close create bookmark modal on cancel/close ([d130f52](https://github.com/debba/storytel-player/commit/d130f52c6f85225a4ed8d28359ddb004247d9179))
+
+
+### Features
+
+* **storytel:** migrate bookshelf and book details to api.storytel.net ([45e98fc](https://github.com/debba/storytel-player/commit/45e98fcee9bbbc937193b9520d385f8571cdd493))
+* **storytel:** stream audio via api.storytel.net assets endpoint ([de62e46](https://github.com/debba/storytel-player/commit/de62e46af97eb3a7e82c8f5d38bbb21a5e551435))
+
 ## [1.2.14](https://github.com/debba/storytel-player/compare/v1.2.13...v1.2.14) (2026-05-15)
 
 
