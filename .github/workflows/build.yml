@@ -13,7 +13,45 @@ defaults:
     shell: bash
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag from package.json
+        id: meta
+        run: |
+          # electron-builder derives its release tag from the package.json version
+          # (v<version>); resolve the same value so we can create the release up front.
+          VERSION=$(node -p "require('./package.json').version")
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create the draft release up front
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          # The build matrix runs in parallel and each electron-builder invocation
+          # would otherwise create its own draft release, racing into duplicate
+          # drafts for the same tag. Creating it once here means every build job
+          # just uploads its assets to the existing release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, reusing it."
+          else
+            gh release create "$TAG" \
+              --draft \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --notes "Automated release build."
+          fi
+
   linux_x64:
+    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
@@ -33,6 +71,7 @@ jobs:
         run: npm run electron:dist:linux:x64 -- --publish always
 
   linux_arm64:
+    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
@@ -52,6 +91,7 @@ jobs:
         run: npm run electron:dist:linux:arm64 -- --publish always
 
   linux_arm:
+    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
@@ -71,6 +111,7 @@ jobs:
         run: npm run electron:dist:linux:arm -- --publish always
 
   dmg_x64:
+    needs: prepare
     runs-on: macos-latest
 
     steps:
@@ -102,6 +143,7 @@ jobs:
         run: npm run electron:dist:mac:x64 -- --publish always
 
   dmg_arm64:
+    needs: prepare
     runs-on: macos-latest
 
     steps:
@@ -133,6 +175,7 @@ jobs:
         run: npm run electron:dist:mac:arm64 -- --publish always
 
   exe:
+    needs: prepare
     runs-on: windows-latest
 
     steps:
