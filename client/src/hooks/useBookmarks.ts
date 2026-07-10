@@ -58,6 +58,11 @@ export const useBookmarks = ({consumableId, onError}: UseBookmarksProps) => {
         setShowCreateBookmarkModal(true);
     };
 
+    const handleCloseCreateBookmarkModal = () => {
+        setShowCreateBookmarkModal(false);
+        setNewBookmarkNote('');
+    };
+
     const handleCloseEditBookmarkModal = () => {
         setShowEditBookmarkModal(false);
         setBookmarkToEdit(null);
@@ -139,6 +144,7 @@ export const useBookmarks = ({consumableId, onError}: UseBookmarksProps) => {
         handleShowEditBookmarkModal,
         handleShowDeleteConfirmModal,
         handleShowCreateBookmarkModal,
+        handleCloseCreateBookmarkModal,
         handleCloseEditBookmarkModal,
         handleCloseDeleteConfirmModal,
         createBookmark,

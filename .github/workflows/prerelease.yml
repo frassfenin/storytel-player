@@ -1,0 +1,159 @@
+name: Pre-Release
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+on:
+  push:
+    tags:
+      # Only pre-release semver tags (those carrying a "-" suffix, e.g. v1.3.0-beta.1).
+      - "v*-*"
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to build (from any fork). Builds from refs/pull/<N>/head and is ALWAYS marked as prerelease."
+        required: false
+      tag_name:
+        description: "Tag/release name (e.g. v1.3.0-beta.1). Required when pr_number is set."
+        required: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.meta.outputs.ref }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Resolve build ref + tag
+        id: meta
+        run: |
+          if [ -n "${{ inputs.pr_number }}" ]; then
+            # Fork/PR builds: check out the PR head and require an explicit tag.
+            if [ -z "${{ inputs.tag_name }}" ]; then
+              echo "::error::tag_name is required when pr_number is provided"
+              exit 1
+            fi
+            echo "ref=refs/pull/${{ inputs.pr_number }}/head" >> "$GITHUB_OUTPUT"
+            TAG="${{ inputs.tag_name }}"
+          else
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ inputs.tag_name || github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # electron-builder derives its release tag from package.json version (v<version>),
+          # so we strip the leading "v" to feed it back in during the build step.
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.ref }}
+
+      - name: Create the pre-release up front
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          # The build matrix runs in parallel and each electron-builder invocation
+          # would otherwise try to create the release itself, racing into a 422
+          # "already_exists" on the tag. Creating it once here means every build job
+          # just uploads its assets to an existing release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, reusing it."
+          else
+            gh release create "$TAG" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --notes "Automated pre-release build."
+          fi
+
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-latest
+            script: electron:dist:linux:x64
+          - name: linux-arm64
+            os: ubuntu-latest
+            script: electron:dist:linux:arm64
+          - name: linux-arm
+            os: ubuntu-latest
+            script: electron:dist:linux:arm
+          - name: mac-x64
+            os: macos-latest
+            script: electron:dist:mac:x64
+          - name: mac-arm64
+            os: macos-latest
+            script: electron:dist:mac:arm64
+          - name: win
+            os: windows-latest
+            script: electron:dist:win
+
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply pre-release version + flag
+        env:
+          REL_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          # Pin the package.json version to the requested tag and force every
+          # publish target to "prerelease" so the GitHub release is flagged as such.
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = process.env.REL_VERSION;
+            const markPrerelease = (node) => {
+              if (!node || typeof node !== "object") return;
+              if (node.publish && node.publish.releaseType) node.publish.releaseType = "prerelease";
+              for (const key of Object.keys(node)) markPrerelease(node[key]);
+            };
+            markPrerelease(pkg.build || {});
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+            console.log("Building pre-release v" + pkg.version);
+          '
+
+      - name: Build
+        run: npm run install-all
+
+      # macOS notarization uses the App Store Connect API key. The .p8 is stored
+      # base64-encoded in APPLE_API_KEY_CONTENT and decoded into a temp file.
+      - name: Prepare Apple API key (macOS only)
+        if: runner.os == 'macOS'
+        run: |
+          echo "${{ secrets.APPLE_API_KEY_CONTENT }}" | base64 --decode > "$RUNNER_TEMP/apple_api_key.p8"
+          echo "APPLE_API_KEY=$RUNNER_TEMP/apple_api_key.p8" >> "$GITHUB_ENV"
+
+      - name: Publish pre-release
+        env:
+          # Scoped to macOS jobs only; empty elsewhere so Windows/Linux signing is untouched.
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_ID: ${{ runner.os == 'macOS' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ runner.os == 'macOS' && secrets.APPLE_API_ISSUER || '' }}
+        run: npm run ${{ matrix.script }} -- --publish always

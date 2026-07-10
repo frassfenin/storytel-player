@@ -28,11 +28,76 @@ interface StorytelAuthError extends Error {
   isLoginFailure?: boolean;
 }
 
+// --- Bookshelf ---------------------------------------------------------------
+
+// Raw shape returned by POST https://api.storytel.net/libraries/bookshelf
+interface RawBookshelfNamedEntity {
+  id: string;
+  name: string;
+  deepLink?: string;
+}
+
+interface RawBookshelfFormat {
+  id: string;
+  type: "abook" | "ebook";
+  durationInMilliseconds?: number;
+  durationInCharacters?: number;
+  cover?: { url: string; width: number; height: number };
+  position?: { position: number; updatedTime: string; kidsMode: boolean };
+}
+
+interface RawBookshelfModel {
+  id: string;
+  title: string;
+  state: "CONSUMING" | "CONSUMED" | "WILL_CONSUME" | string;
+  kidsBook?: boolean;
+  authors?: RawBookshelfNamedEntity[];
+  narrators?: RawBookshelfNamedEntity[];
+  formats?: RawBookshelfFormat[];
+  category?: { id: number; name: string };
+}
+
+interface RawBookshelfResponse {
+  items?: Record<string, { action: string; model: RawBookshelfModel }>;
+  followingItems?: Record<string, unknown>;
+  collections?: Record<string, unknown>;
+}
+
+// Subset of the legacy BookShelfEntity (client/src/interfaces/books.ts) that
+// the frontend actually reads. Keep the keys aligned with that interface so
+// the React app keeps working unchanged.
+interface BookShelfEntity {
+  id: string;
+  status: number;
+  book: {
+    name: string;
+    authorsAsString: string;
+    consumableId: string;
+    largeCover: string;
+    largeCoverE: string;
+    category: { title: string };
+    language: { localizedName: string };
+  };
+  abook: {
+    id: string;
+    narratorAsString: string;
+    time: number;
+    description: string;
+  } | null;
+  abookMark: { pos: number } | null;
+  ebook: RawBookshelfFormat | null;
+}
+
+interface BookShelfResponse {
+  books: BookShelfEntity[];
+}
+
 class StorytelClient {
   private client: AxiosInstance;
   public loginData: LoginData;
   private ssoSession: SsoSession | null = null;
-  private cachedFirebaseIdToken: { token: string; expiresAt: number } | null = null;
+  private cachedFirebaseIdToken: { token: string; expiresAt: number } | null =
+    null;
 
   constructor() {
     this.client = axios.create({
@@ -158,7 +223,7 @@ class StorytelClient {
     // Mark legacy credentials as unset so any accidental fallback path errors
     // visibly instead of using stale data.
     this.loginData = {
-      accountInfo: { jwt: '', singleSignToken: '' },
+      accountInfo: { jwt: "", singleSignToken: "" },
     };
   }
 
@@ -176,16 +241,19 @@ class StorytelClient {
 
   private async ensureFirebaseIdToken(): Promise<string> {
     if (!this.ssoSession) {
-      throw new Error('ensureFirebaseIdToken called outside SSO mode');
+      throw new Error("ensureFirebaseIdToken called outside SSO mode");
     }
     const now = Math.floor(Date.now() / 1000);
     const cached = this.cachedFirebaseIdToken;
-    if (cached && cached.expiresAt - FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS > now) {
+    if (
+      cached &&
+      cached.expiresAt - FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS > now
+    ) {
       return cached.token;
     }
     const params = new URLSearchParams();
-    params.set('grant_type', 'refresh_token');
-    params.set('refresh_token', this.ssoSession.firebaseRefreshToken);
+    params.set("grant_type", "refresh_token");
+    params.set("refresh_token", this.ssoSession.firebaseRefreshToken);
     try {
       const response = await axios.post<{
         access_token: string;
@@ -196,12 +264,12 @@ class StorytelClient {
         params.toString(),
         {
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
             Referer: FIREBASE_REFERER,
-            Origin: 'https://www.storytel.com',
+            Origin: "https://www.storytel.com",
           },
           timeout: 15000,
-        }
+        },
       );
       const accessToken = response.data.access_token;
       const expiresIn = parseInt(response.data.expires_in, 10) || 3600;
@@ -213,7 +281,7 @@ class StorytelClient {
     } catch (error: any) {
       const status = error.response?.status;
       if (status === 400 || status === 401 || status === 403) {
-        const authError: any = new Error('Firebase refresh token rejected');
+        const authError: any = new Error("Firebase refresh token rejected");
         authError.isStorytelUnauthorized = true;
         throw authError;
       }
@@ -284,21 +352,107 @@ class StorytelClient {
     }
   }
 
-  async getBookshelf(): Promise<any> {
-    const url = `https://www.storytel.com/api/getBookShelf.action?token=${encodeURIComponent(this.getLegacyActionToken())}`;
+  async getBookshelf(): Promise<BookShelfResponse> {
+    const url = `https://api.storytel.net/libraries/bookshelf`;
 
     try {
-      const response = await this.client.get(url);
-      return {
-        ...response.data,
-        books: response.data.books.filter(
-          (book: { status: number }) => book.status === 2 || book.status === 1,
-        ),
+      const bearer = await this.getApiBearer();
+      const response = await this.client.post<RawBookshelfResponse>(
+        url,
+        { items: [] },
+        {
+          headers: {
+            Authorization: `Bearer ${bearer}`,
+            "content-type": "application/x-www-form-urlencoded",
+            Accept: "*/*",
+          },
+        },
+      );
+
+      // The endpoint returns { items: { "<id>": { action, model } } } with a
+      // shape that differs from the legacy getBookShelf.action response. Remap
+      // each `model` onto the legacy BookShelfEntity keys so the existing
+      // frontend keeps working unchanged.
+      const items = response.data?.items;
+      if (!items || typeof items !== "object") return { books: [] };
+
+      // Library state -> legacy numeric status (1 = in progress / to read,
+      // 2 = finished). The Dashboard keeps only {1,2} by default.
+      const stateToStatus: Record<string, number> = {
+        CONSUMING: 1,
+        WILL_CONSUME: 1,
+        CONSUMED: 2,
       };
+
+      const books = Object.values(items)
+        .map((entry) => entry?.model)
+        .filter(Boolean)
+        .map((model): BookShelfEntity => {
+          const formats: RawBookshelfFormat[] = Array.isArray(model.formats)
+            ? model.formats
+            : [];
+          const abookFormat = formats.find((f) => f.type === "abook");
+          const ebookFormat = formats.find((f) => f.type === "ebook");
+          const coverUrl =
+            abookFormat?.cover?.url ?? ebookFormat?.cover?.url ?? "";
+          const join = (arr?: RawBookshelfNamedEntity[]) =>
+            (Array.isArray(arr) ? arr : [])
+              .map((x) => x?.name)
+              .filter(Boolean)
+              .join(", ");
+
+          return {
+            id: model.id,
+            status: stateToStatus[model.state] ?? 1,
+            book: {
+              name: model.title,
+              authorsAsString: join(model.authors),
+              consumableId: String(model.id),
+              // Full absolute URL (covers.storytel.com). See note below.
+              largeCover: coverUrl,
+              largeCoverE: "",
+              category: { title: model.category?.name ?? "" },
+              language: { localizedName: "" },
+            },
+            abook: abookFormat
+              ? {
+                  id: abookFormat.id,
+                  narratorAsString: join(model.narrators),
+                  // Legacy frontend expects microseconds; API gives ms.
+                  time: (abookFormat.durationInMilliseconds ?? 0) * 1000,
+                  description: "",
+                }
+              : null,
+            abookMark: abookFormat?.position
+              ? { pos: (abookFormat.position.position ?? 0) * 1000 }
+              : null,
+            ebook: ebookFormat ?? null,
+          };
+        });
+
+      return { books };
     } catch (error: any) {
       if (error.isStorytelUnauthorized) throw error;
       console.error(error);
       throw new Error(`Failed to get bookshelf: ${error.message}`);
+    }
+  }
+
+  async getBookDetails(consumableId: string): Promise<any> {
+    const url = `https://api.storytel.net/book-details/consumables/${consumableId}?kidsMode=false&configVariant=default`;
+
+    try {
+      const bearer = await this.getApiBearer();
+      const response = await this.client.get(url, {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          Accept: "*/*",
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      throw new Error(`Failed to get book details: ${error.message}`);
     }
   }
 
@@ -316,6 +470,33 @@ class StorytelClient {
     } catch (error: any) {
       if (error.isStorytelUnauthorized) throw error;
       throw new Error(`Failed to get bookinfo: ${error.message}`);
+    }
+  }
+
+  // New api.storytel.net audio endpoint. Returns a 302 redirect to a signed
+  // mp3 URL on the CDN. Keyed by consumableId (not the abook/program id).
+  async getAudioStreamUrl(consumableId: string): Promise<string> {
+    const url = `https://api.storytel.net/assets/v2/consumables/${consumableId}/abook`;
+
+    try {
+      const bearer = await this.getApiBearer();
+      const response = await this.client.get(url, {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          Accept: "*/*",
+        },
+      });
+      // maxRedirects is 0 on the client, so a 2xx here is unexpected; prefer
+      // the redirect Location captured below in the catch.
+      return (
+        (response.request as any)?.res?.responseUrl ||
+        response.headers.location
+      );
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      const location = error.response?.headers?.location;
+      if (location) return location;
+      throw new Error(`Failed to get audio stream URL: ${error.message}`);
     }
   }
 

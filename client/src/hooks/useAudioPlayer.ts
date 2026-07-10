@@ -59,14 +59,14 @@ export const useAudioPlayer = ({bookId, consumableId, playbackRate, onLoadError}
     const loadAudioStream = useCallback(async () => {
         try {
             setIsLoading(true);
-            const response = await api.post('/stream', {bookId});
+            const response = await api.post('/stream', {bookId, consumableId});
             setAudioSrc(response.data.streamUrl);
         } catch (err: any) {
             onLoadError(err.response?.data?.error || 'Failed to load audio');
         } finally {
             setIsLoading(false);
         }
-    }, [bookId, onLoadError]);
+    }, [bookId, consumableId, onLoadError]);
 
     const updatePosition = useCallback(async () => {
         if (!audioRef.current || !consumableId) return;

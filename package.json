@@ -1,6 +1,6 @@
 {
   "name": "storytel-player",
-  "version": "1.2.14",
+  "version": "1.2.15",
   "email": "andrea@debbaweb.it",
   "description": "Storytel Unofficial Player - Storytel audiobook player for desktop",
   "main": "dist/electron/main.js",
@@ -84,6 +84,11 @@
     "mac": {
       "category": "public.app-category.audio",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist",
+      "notarize": true,
       "publish": {
         "provider": "github",
         "releaseType": "draft"
