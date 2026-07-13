@@ -1,3 +1,15 @@
+## [1.2.16](https://github.com/debba/storytel-player/compare/v1.2.15...v1.2.16) (2026-07-13)
+
+
+### Bug Fixes
+
+* **auth:** restore Firebase token refresh ([e9a5cef](https://github.com/debba/storytel-player/commit/e9a5cef78ca6aea5cf27452915d3cae4bb16765f))
+
+
+### Features
+
+* **error:** keep header visible and add logout on bookshelf error ([1f91d0e](https://github.com/debba/storytel-player/commit/1f91d0e539c3581ee197297e7d84a057b764ba25))
+
 ## [1.2.15](https://github.com/debba/storytel-player/compare/v1.2.15-beta1...v1.2.15) (2026-07-10)
 
 
