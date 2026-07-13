@@ -28,6 +28,18 @@ interface StorytelAuthError extends Error {
   isLoginFailure?: boolean;
 }
 
+export interface SsoSession {
+  storytelSession: string;
+  firebaseRefreshToken: string;
+  firebaseApiKey: string;
+  email: string;
+  cid: string;
+}
+
+const FIREBASE_TOKEN_URL = "https://securetoken.googleapis.com";
+const FIREBASE_REFERER = "https://www.storytel.com/";
+const FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS = 60;
+
 // --- Bookshelf ---------------------------------------------------------------
 
 // Raw shape returned by POST https://api.storytel.net/libraries/bookshelf
@@ -256,7 +268,8 @@ class StorytelClient {
     params.set("refresh_token", this.ssoSession.firebaseRefreshToken);
     try {
       const response = await axios.post<{
-        access_token: string;
+        id_token?: string;
+        access_token?: string;
         expires_in: string;
         refresh_token?: string;
       }>(
@@ -271,7 +284,10 @@ class StorytelClient {
           timeout: 15000,
         },
       );
-      const accessToken = response.data.access_token;
+      const accessToken = response.data.id_token ?? response.data.access_token;
+      if (!accessToken) {
+        throw new Error("Firebase token response did not include an ID token");
+      }
       const expiresIn = parseInt(response.data.expires_in, 10) || 3600;
       this.cachedFirebaseIdToken = {
         token: accessToken,

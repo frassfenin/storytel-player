@@ -63,6 +63,12 @@
     "tooltipEdit": "Editar marcador",
     "tooltipDelete": "Eliminar marcador"
   },
+  "errorState": {
+    "title": "Algo salió mal",
+    "tryAgain": "Reintentar",
+    "logoutHint": "Si el problema persiste, cierra sesión",
+    "logout": "Cerrar sesión"
+  },
   "common": {
     "loading": "Cargando...",
     "error": "Error",

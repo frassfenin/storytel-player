@@ -63,6 +63,12 @@
     "tooltipEdit": "Redigera bokmärke",
     "tooltipDelete": "Ta bort bokmärke"
   },
+  "errorState": {
+    "title": "Något gick fel",
+    "tryAgain": "Försök igen",
+    "logoutHint": "Om problemet kvarstår, logga ut",
+    "logout": "Logga ut"
+  },
   "common": {
     "loading": "Laddar...",
     "error": "Fel",
