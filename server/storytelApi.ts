@@ -420,6 +420,8 @@ class StorytelClient {
           return {
             id: model.id,
             status: stateToStatus[model.state] ?? 1,
+            stateUpdateTime: model.stateUpdateTime,
+            positionUpdatedTime: abookFormat?.position?.updatedTime,
             book: {
               name: model.title,
               authorsAsString: join(model.authors),
