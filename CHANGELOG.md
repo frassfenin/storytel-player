@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Bug Fixes
+
+* **bookshelf:** fix status mapping for book state filters
+
 ## [1.2.16](https://github.com/debba/storytel-player/compare/v1.2.15...v1.2.16) (2026-07-13)
 
 
