@@ -1,20 +1,3 @@
-## [Unreleased]
-
-### Bug Fixes
-
-* **bookshelf:** fix status mapping for book state filters
-
-### Features
-
-* **bookshelf:** add timestamps for sorting books by listening recency (prioritizes positionUpdatedTime, falls back to stateUpdateTime)
-* **electron:** add cross-env dependency for cross-platform environment variable support (fixes NODE_ENV on Windows)
-* **electron:** upgrade from ^40.4.1 to ^43.1.0
-* **electron:dev:** new npm script for development mode with NODE_ENV=development
-* **electron:debug:** new npm script for development debugging with IS_DEBUG=true flag
-* **electron:** improve development server startup with smart retry logic (attempt localhost:3000 every 1s, max 30 times)
-* **electron:** add client process logging to client.log for startup diagnostics
-* **electron:** use realpathSync.native to correctly resolve paths on Windows SUBST drives
-
 ## [1.2.16](https://github.com/debba/storytel-player/compare/v1.2.15...v1.2.16) (2026-07-13)
 
 
