@@ -192,5 +192,29 @@
     "typeAction": "Actions de l'utilisateur",
     "confirmClear": "Êtes-vous sûr de vouloir effacer tous les journaux ? Cette action est irréversible.",
     "details": "Détails"
+  },
+  "floatingMenu": {
+    "library": "Bibliothèque",
+    "search": "Rechercher sur Storytel",
+    "player": "Lecteur",
+    "logs": "Journaux",
+    "settings": "Paramètres"
+  },
+  "search": {
+    "title": "Rechercher dans le catalogue Storytel",
+    "placeholder": "Rechercher par titre, auteur ou narrateur...",
+    "results": "Résultats de recherche",
+    "noResults": "Aucun livre trouvé pour",
+    "searching": "Recherche en cours...",
+    "initialPrompt": "Recherchez parmi des milliers de livres audio et e-books sur Storytel",
+    "play": "Écouter",
+    "details": "Détails",
+    "addToBookshelf": "Ajouter à la bibliothèque",
+    "addedToBookshelf": "Ajouté à la bibliothèque",
+    "audiobook": "Livre audio",
+    "ebook": "E-book",
+    "hours": "h",
+    "minutes": "min",
+    "shortcut": "Appuyez sur ⌘K / Ctrl+K à tout moment"
   }
 }

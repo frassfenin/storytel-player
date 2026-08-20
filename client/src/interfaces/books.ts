@@ -171,3 +171,20 @@ export interface SttMapping {
     syncedReadingEnabled: boolean
     mappingFileUrl: string
 }
+
+export interface SearchResultBook {
+    id: string
+    title: string
+    authors: string
+    narrators: string
+    coverUrl: string
+    category: string
+    durationMs: number
+    description?: string
+    hasAbook: boolean
+    hasEbook: boolean
+}
+
+export interface SearchResponse {
+    results: SearchResultBook[]
+}

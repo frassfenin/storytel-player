@@ -192,5 +192,29 @@
     "typeAction": "Användaråtgärder",
     "confirmClear": "Är du säker på att du vill rensa alla loggar? Denna åtgärd kan inte ångras.",
     "details": "Detaljer"
+  },
+  "floatingMenu": {
+    "library": "Bokhylla",
+    "search": "Sök i Storytel",
+    "player": "Spelare",
+    "logs": "Loggar",
+    "settings": "Inställningar"
+  },
+  "search": {
+    "title": "Sök i Storytels utbud",
+    "placeholder": "Sök efter titel, författare eller uppläsare...",
+    "results": "Sökresultat",
+    "noResults": "Inga böcker hittades för",
+    "searching": "Söker...",
+    "initialPrompt": "Sök bland hundratusentals ljudböcker och e-böcker på Storytel",
+    "play": "Spela",
+    "details": "Detaljer",
+    "addToBookshelf": "Lägg till i bokhylla",
+    "addedToBookshelf": "Tillagd i bokhyllan",
+    "audiobook": "Ljudbok",
+    "ebook": "E-bok",
+    "hours": "tim",
+    "minutes": "min",
+    "shortcut": "Tryck ⌘K / Ctrl+K när som helst"
   }
 }

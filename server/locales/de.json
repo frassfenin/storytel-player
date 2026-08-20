@@ -192,5 +192,29 @@
     "typeAction": "Benutzeraktionen",
     "confirmClear": "Möchten Sie wirklich alle Protokolle löschen? Dies kann nicht rückgängig gemacht werden.",
     "details": "Details"
+  },
+  "floatingMenu": {
+    "library": "Bibliothek",
+    "search": "Storytel durchsuchen",
+    "player": "Player",
+    "logs": "Protokolle",
+    "settings": "Einstellungen"
+  },
+  "search": {
+    "title": "Storytel-Katalog durchsuchen",
+    "placeholder": "Nach Titel, Autor oder Sprecher suchen...",
+    "results": "Suchergebnisse",
+    "noResults": "Keine Bücher gefunden für",
+    "searching": "Suche...",
+    "initialPrompt": "Durchsuchen Sie den Storytel-Katalog nach Hörbüchern und E-Books",
+    "play": "Abspielen",
+    "details": "Details",
+    "addToBookshelf": "Zur Bibliothek hinzufügen",
+    "addedToBookshelf": "Zur Bibliothek hinzugefügt",
+    "audiobook": "Hörbuch",
+    "ebook": "E-Book",
+    "hours": "Std.",
+    "minutes": "Min.",
+    "shortcut": "Drücken Sie ⌘K / Strg+K jederzeit"
   }
 }

@@ -196,5 +196,29 @@
     "typeAction": "Azioni Utente",
     "confirmClear": "Sei sicuro di voler svuotare i log? L'operazione non può essere annullata.",
     "details": "Dettagli"
+  },
+  "floatingMenu": {
+    "library": "Libreria",
+    "search": "Cerca in Storytel",
+    "player": "Player",
+    "logs": "Log",
+    "settings": "Impostazioni"
+  },
+  "search": {
+    "title": "Cerca nel catalogo Storytel",
+    "placeholder": "Cerca per titolo, autore o narratore...",
+    "results": "Risultati di ricerca",
+    "noResults": "Nessun libro trovato per",
+    "searching": "Ricerca in corso...",
+    "initialPrompt": "Cerca tra migliaia di audiolibri ed ebook su Storytel",
+    "play": "Ascolta",
+    "details": "Dettagli",
+    "addToBookshelf": "Aggiungi alla libreria",
+    "addedToBookshelf": "Aggiunto alla libreria",
+    "audiobook": "Audiolibro",
+    "ebook": "E-book",
+    "hours": "h",
+    "minutes": "min",
+    "shortcut": "Premi ⌘K / Ctrl+K in qualsiasi momento"
   }
 }

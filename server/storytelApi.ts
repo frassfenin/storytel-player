@@ -36,6 +36,19 @@ export interface SsoSession {
   cid: string;
 }
 
+export interface SearchResultBook {
+  id: string;
+  title: string;
+  authors: string;
+  narrators: string;
+  coverUrl: string;
+  category: string;
+  durationMs: number;
+  description?: string;
+  hasAbook: boolean;
+  hasEbook: boolean;
+}
+
 const FIREBASE_TOKEN_URL = "https://securetoken.googleapis.com";
 const FIREBASE_REFERER = "https://www.storytel.com/";
 const FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS = 60;
@@ -453,6 +466,171 @@ class StorytelClient {
       if (error.isStorytelUnauthorized) throw error;
       console.error(error);
       throw new Error(`Failed to get bookshelf: ${error.message}`);
+    }
+  }
+
+  async searchCatalog(query: string): Promise<SearchResultBook[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    const results: SearchResultBook[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Try official storytel.com web search API (returns full catalog)
+    try {
+      const searchActionUrl = `https://www.storytel.com/api/search.action?q=${encodeURIComponent(trimmed)}`;
+      const response = await this.client.get(searchActionUrl, {
+        headers: {
+          Accept: "application/json, text/plain, */*",
+        },
+      });
+
+      const data = response.data;
+      if (data && Array.isArray(data.books)) {
+        for (const item of data.books) {
+          const book = item?.book || {};
+          const abook = item?.abook || {};
+          const ebook = item?.ebook || {};
+
+          const id = String(book.consumableId || book.id || abook.id || item.id || "");
+          const title = book.name || book.title || "";
+          if (!id || !title || seenIds.has(id)) continue;
+          seenIds.add(id);
+
+          const coverUrl =
+            book.largeCover ||
+            book.largeCoverE ||
+            book.cover ||
+            book.coverE ||
+            book.smallCover ||
+            abook.cover ||
+            "";
+
+          const authors =
+            book.authorsAsString ||
+            (Array.isArray(book.authors) ? book.authors.map((a: any) => a?.name || a).join(", ") : "");
+
+          const narrators =
+            abook.narratorAsString ||
+            (Array.isArray(abook.narrators) ? abook.narrators.map((n: any) => n?.name || n).join(", ") : "");
+
+          const durationMs = abook.length
+            ? Number(abook.length)
+            : abook.time
+            ? Math.floor(Number(abook.time) / 1000000)
+            : 0;
+
+          results.push({
+            id,
+            title,
+            authors: authors || "",
+            narrators: narrators || "",
+            coverUrl: coverUrl || "",
+            category: book.category?.title || book.category?.name || "",
+            durationMs,
+            description: abook.description || ebook.description || "",
+            hasAbook: !!abook.id || !!item.abook,
+            hasEbook: !!ebook.id || !!item.ebook,
+          });
+        }
+
+        if (results.length > 0) {
+          return results;
+        }
+      }
+    } catch (err) {
+      console.warn("[storytelApi] storytel.com search failed, trying fallback endpoints:", err);
+    }
+
+    // 2. Fallback to api.storytel.net endpoints if search.action yielded 0 results
+    try {
+      const bearer = await this.getApiBearer();
+      const headers = {
+        Authorization: `Bearer ${bearer}`,
+        Accept: "*/*",
+      };
+
+      const endpoints = [
+        `https://api.storytel.net/search/v2?query=${encodeURIComponent(trimmed)}&configVariant=default`,
+        `https://api.storytel.net/search/page?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
+        `https://api.storytel.net/search?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
+      ];
+
+      for (const url of endpoints) {
+        try {
+          const response = await this.client.get(url, { headers });
+          const rawItems = Array.isArray(response.data?.items)
+            ? response.data.items
+            : Array.isArray(response.data?.results)
+            ? response.data.results
+            : [];
+
+          for (const raw of rawItems) {
+            const model = raw.model || raw.book || raw;
+            const id = String(model.id || model.consumableId || raw.id || "");
+            const title = model.title || model.name || raw.title || "";
+            if (!id || !title || seenIds.has(id)) continue;
+            seenIds.add(id);
+
+            const formats: any[] = Array.isArray(model.formats) ? model.formats : [];
+            const abook = formats.find((f: any) => f.type === "abook");
+            const ebook = formats.find((f: any) => f.type === "ebook");
+            const coverUrl = abook?.cover?.url || ebook?.cover?.url || model.cover?.url || "";
+
+            results.push({
+              id,
+              title,
+              authors: Array.isArray(model.authors) ? model.authors.map((a: any) => a?.name || a).join(", ") : "",
+              narrators: Array.isArray(model.narrators) ? model.narrators.map((n: any) => n?.name || n).join(", ") : "",
+              coverUrl,
+              category: model.category?.name || model.category?.title || "",
+              durationMs: abook?.durationInMilliseconds || 0,
+              description: model.description || "",
+              hasAbook: !!abook,
+              hasEbook: !!ebook,
+            });
+          }
+
+          if (results.length > 0) return results;
+        } catch {
+          // continue
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return results;
+  }
+
+  async addToBookshelf(consumableId: string): Promise<any> {
+    const url = `https://api.storytel.net/libraries/bookshelf`;
+    try {
+      const bearer = await this.getApiBearer();
+      const response = await this.client.post(
+        url,
+        {
+          items: [
+            {
+              action: "ADD",
+              model: {
+                id: String(consumableId),
+              },
+            },
+          ],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${bearer}`,
+            "content-type": "application/x-www-form-urlencoded",
+            Accept: "*/*",
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      throw new Error(`Failed to add book to bookshelf: ${error.message}`);
     }
   }
 

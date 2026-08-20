@@ -213,6 +213,54 @@ fastify.get(
   },
 );
 
+// Route to search Storytel catalog
+fastify.get<{
+  Querystring: { q?: string; query?: string };
+}>(
+  "/api/search",
+  {
+    preHandler: fastify.authenticate,
+  },
+  async (request, reply) => {
+    try {
+      const q = request.query.q || request.query.query || "";
+      if (!q.trim()) {
+        return reply.send({ results: [] });
+      }
+
+      const storytelClient = hydrateStorytelClient(request.user);
+      const results = await storytelClient.searchCatalog(q);
+      reply.send({ results });
+    } catch (error: any) {
+      replyError(reply, error);
+    }
+  },
+);
+
+// Route to add book to bookshelf
+fastify.post<{
+  Body: { consumableId: string };
+}>(
+  "/api/bookshelf/add",
+  {
+    preHandler: fastify.authenticate,
+  },
+  async (request, reply) => {
+    try {
+      const { consumableId } = request.body;
+      if (!consumableId) {
+        return reply.code(400).send({ error: "Missing consumableId" });
+      }
+
+      const storytelClient = hydrateStorytelClient(request.user);
+      const result = await storytelClient.addToBookshelf(consumableId);
+      reply.send({ success: true, result });
+    } catch (error: any) {
+      replyError(reply, error);
+    }
+  },
+);
+
 // Route per ottenere stream URL
 fastify.post<{
   Body: { bookId: string; consumableId?: string };

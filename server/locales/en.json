@@ -196,5 +196,29 @@
     "typeAction": "User Actions",
     "confirmClear": "Are you sure you want to clear all logs? This cannot be undone.",
     "details": "Details"
+  },
+  "floatingMenu": {
+    "library": "Library",
+    "search": "Search Storytel",
+    "player": "Player",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "search": {
+    "title": "Search Storytel",
+    "placeholder": "Search by title, author, or narrator...",
+    "results": "Search results",
+    "noResults": "No books found for",
+    "searching": "Searching...",
+    "initialPrompt": "Type to search Storytel's vast catalog of audiobooks",
+    "play": "Play",
+    "details": "Details",
+    "addToBookshelf": "Add to Library",
+    "addedToBookshelf": "Added to Library",
+    "audiobook": "Audiobook",
+    "ebook": "E-book",
+    "hours": "h",
+    "minutes": "min",
+    "shortcut": "Press ⌘K / Ctrl+K anytime"
   }
 }

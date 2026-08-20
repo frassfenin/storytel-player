@@ -1,79 +1,90 @@
 import React from 'react';
-import {buildCoverUrl, formatMicrosecondsTime, formatTime} from "../utils/helpers";
-import {BookShelfEntity} from "../interfaces/books";
-import {useTranslation} from "react-i18next";
+import { buildCoverUrl, formatMicrosecondsTime } from '../utils/helpers';
+import { BookShelfEntity } from '../interfaces/books';
+import { useTranslation } from 'react-i18next';
 
 interface BookCardProps {
-    book: BookShelfEntity;
-    onBookSelect: (book: BookShelfEntity) => void;
+  book: BookShelfEntity;
+  onBookSelect: (book: BookShelfEntity) => void;
 }
 
-function BookCard({book, onBookSelect}: BookCardProps) {
-    const {t} = useTranslation();
+function BookCard({ book, onBookSelect }: BookCardProps) {
+  const { t } = useTranslation();
 
-    const position = book.abookMark ? book.abookMark.pos : 0;
-    const totalDuration = book.abook.time;
+  const position = book.abookMark ? book.abookMark.pos : 0;
+  const totalDuration = book.abook?.time || 0;
+  const remainingTime = Math.max(totalDuration - position, 0);
 
-    const getCategoryLabel = (book: BookShelfEntity) => {
-        return book.book.category.title;
-    };
+  const progressPercent =
+    totalDuration > 0 ? Math.min(Math.max((position / totalDuration) * 100, 0), 100) : 0;
 
-    const category = getCategoryLabel(book);
-    const remainingTime = totalDuration - position;
+  const coverUrl =
+    book.book.largeCover ||
+    book.book.largeCoverE ||
+    book.book.cover ||
+    book.book.coverE ||
+    book.book.smallCover;
 
-    return (
+  return (
+    <div
+      onClick={() => onBookSelect(book)}
+      className="bg-[#141414] hover:bg-[#1A1A1A] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex gap-4 transition-all duration-200 shadow-lg cursor-pointer group select-none relative overflow-hidden"
+    >
+      {/* Book Cover */}
+      <div className="relative flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shadow-md bg-gray-900 flex items-center justify-center">
+        {coverUrl ? (
+          <img
+            src={buildCoverUrl(coverUrl)}
+            alt={book.book.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        )}
+      </div>
 
-
-        <div className="border-b border-gray-800 pb-6 relative group">
-            <div className="flex items-center space-x-4">
-                <div className="flex-shrink-0 flex flex-col">
-                    <img
-                        src={buildCoverUrl(book.book.largeCover || book.book.largeCoverE)}
-                        alt={book.book.name}
-                        className="w-32 h-32 object-cover rounded-lg shadow-lg mb-2"
-                    />
-                    <span className="text-white text-sm">{category}</span>
-                </div>
-
-                <div className="flex-1 min-w-0 flex flex-col">
-                    <div className="mb-1">
-                        <h2 className="text-lg font-bold text-white mb-0.5 truncate">{book.book.name}</h2>
-                        <p className="text-sm text-gray-300 mb-0.5 truncate">{t('bookCard.author')} {book.book.authorsAsString}</p>
-                        <p className="text-sm text-gray-300 mb-2 truncate">{t('bookCard.narrator')} {book.abook.narratorAsString}</p>
-                    </div>
-
-                    <div className="mt-auto flex items-center gap-4">
-                        <p className="text-sm text-white whitespace-nowrap">
-                            {remainingTime > 0 ? formatMicrosecondsTime(remainingTime) + ' ' + t('bookCard.remaining') : t('bookCard.completed')}
-                        </p>
-                        {position > 0 && (
-                            <div className="w-[100px] bg-gray-700 rounded-full h-2">
-                                <div
-                                    className="bg-orange-600 h-2 rounded-full transition-all duration-300"
-                                    style={{
-                                        width: `${Math.min((position / totalDuration) * 100, 100)}%`
-                                    }}
-                                ></div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div
-                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer"
-                onClick={() => onBookSelect(book)}
-            >
-                <div className="bg-black bg-opacity-75 rounded-full p-4">
-                    <button className="p-4 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors">
-                        <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+      {/* Book Information */}
+      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+        <div>
+          <h3 className="text-white font-bold text-base sm:text-lg line-clamp-1 group-hover:text-orange-400 transition-colors">
+            {book.book.name}
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-400 mt-1 truncate">
+            <span className="text-gray-400">{t('bookCard.author', 'Författare')}:</span>{' '}
+            <span className="text-gray-300 font-medium">{book.book.authorsAsString || '—'}</span>
+          </p>
+          {book.abook?.narratorAsString && (
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">
+              <span className="text-gray-400">{t('bookCard.narrator', 'Uppläsare')}:</span>{' '}
+              <span className="text-gray-300 font-medium">{book.abook.narratorAsString}</span>
+            </p>
+          )}
         </div>
-    );
+
+        {/* Bottom Progress Row */}
+        <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/5">
+          <span className="text-xs text-gray-400 font-medium">
+            {position > 0 && remainingTime > 0
+              ? `${formatMicrosecondsTime(remainingTime)} ${t('bookCard.remaining', 'kvar')}`
+              : totalDuration > 0
+              ? formatMicrosecondsTime(totalDuration)
+              : t('bookCard.completed', 'Avslutad')}
+          </span>
+
+          <div className="w-24 sm:w-36 h-1.5 bg-[#2C2C2E] rounded-full overflow-hidden flex-shrink-0">
+            <div
+              className="bg-[#FF5100] h-full rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(255,81,0,0.5)]"
+              style={{
+                width: `${position > 0 ? progressPercent : 0}%`,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default BookCard;

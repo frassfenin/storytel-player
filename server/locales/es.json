@@ -192,5 +192,29 @@
     "typeAction": "Acciones del usuario",
     "confirmClear": "¿Estás seguro de que quieres borrar todos los registros? Esta acción no se puede deshacer.",
     "details": "Detalles"
+  },
+  "floatingMenu": {
+    "library": "Biblioteca",
+    "search": "Buscar en Storytel",
+    "player": "Reproductor",
+    "logs": "Registros",
+    "settings": "Ajustes"
+  },
+  "search": {
+    "title": "Buscar en el catálogo de Storytel",
+    "placeholder": "Buscar por título, autor o narrador...",
+    "results": "Resultados de búsqueda",
+    "noResults": "No se encontraron libros para",
+    "searching": "Buscando...",
+    "initialPrompt": "Busca en el catálogo de audiolibros y libros electrónicos de Storytel",
+    "play": "Reproducir",
+    "details": "Detalles",
+    "addToBookshelf": "Añadir a la biblioteca",
+    "addedToBookshelf": "Añadido a la biblioteca",
+    "audiobook": "Audiolibro",
+    "ebook": "Libro electrónico",
+    "hours": "h",
+    "minutes": "min",
+    "shortcut": "Presiona ⌘K / Ctrl+K en cualquier momento"
   }
 }

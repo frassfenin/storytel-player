@@ -18,13 +18,61 @@ function BookView() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [showFullDescription, setShowFullDescription] = useState(false);
+    const [fetchedBook, setFetchedBook] = useState<BookShelfEntity | null>(null);
 
-    const book: BookShelfEntity = location.state?.book;
+    const book: BookShelfEntity | null = location.state?.book || fetchedBook;
 
     // description and language are not part of the bookshelf payload; they come
     // from the per-book book-details endpoint, fetched lazily below.
     const [description, setDescription] = useState('');
     const [language, setLanguage] = useState('');
+
+    useEffect(() => {
+        if (!location.state?.book && bookId) {
+            setIsLoading(true);
+            api.get(`/book-details/${bookId}`)
+                .then((res) => {
+                    const data = res.data || {};
+                    const formats = data.formats || [];
+                    const abook = formats.find((f: any) => f.type === 'abook');
+                    const ebook = formats.find((f: any) => f.type === 'ebook');
+                    const cover = abook?.cover?.url || ebook?.cover?.url || data.cover?.url || '';
+                    const authors = (data.authors || []).map((a: any) => a.name).join(', ');
+                    const narrators = (data.narrators || []).map((n: any) => n.name).join(', ');
+                    const entity: any = {
+                        id: bookId,
+                        status: 1,
+                        book: {
+                            name: data.title || '',
+                            authorsAsString: authors,
+                            consumableId: String(bookId),
+                            largeCover: cover,
+                            largeCoverE: '',
+                            category: { title: data.category?.name || '' },
+                            language: { localizedName: '' }
+                        },
+                        abook: abook ? {
+                            id: abook.id || bookId,
+                            narratorAsString: narrators,
+                            time: (abook.durationInMilliseconds || 0) * 1000,
+                            description: data.description || ''
+                        } : null,
+                        abookMark: null,
+                        ebook: ebook || null
+                    };
+                    setFetchedBook(entity);
+                    setDescription(data.description || '');
+                    setLanguage(localizedLanguageName(data.language, i18n.language));
+                })
+                .catch((err) => {
+                    console.error('Failed to fetch book details:', err);
+                    setError(t('bookView.loadError', 'Failed to load book details'));
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                });
+        }
+    }, [bookId, location.state, i18n.language, t]);
 
     useEffect(() => {
         if (book) {
@@ -36,10 +84,10 @@ function BookView() {
         };
     }, [book]);
 
-    // Fetch description and language from the book-details endpoint.
+    // Fetch description and language from the book-details endpoint if book was passed via state.
     useEffect(() => {
         const consumableId = book?.book?.consumableId;
-        if (!consumableId) return;
+        if (!consumableId || fetchedBook) return;
         let cancelled = false;
         api.get(`/book-details/${consumableId}`)
             .then((res) => {
@@ -54,7 +102,7 @@ function BookView() {
         return () => {
             cancelled = true;
         };
-    }, [book, i18n.language]);
+    }, [book, fetchedBook, i18n.language]);
 
     const handlePlayBook = () => {
         navigate(`/player/${bookId}`, {state: {book}});
