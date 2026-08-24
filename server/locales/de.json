@@ -6,6 +6,10 @@
     "password": "Passwort",
     "signIn": "Anmelden",
     "signingIn": "Anmeldung läuft...",
+    "ssoDivider": "oder",
+    "ssoGoogle": "Mit Google fortfahren",
+    "ssoApple": "Mit Apple fortfahren",
+    "ssoOpening": "Storytel-Anmeldung wird geöffnet...",
     "errors": {
       "required": "Bitte geben Sie sowohl E-Mail als auch Passwort ein",
       "failed": "Anmeldung fehlgeschlagen",
@@ -16,7 +20,8 @@
     "title": "Meine Bibliothek",
     "logout": "Abmelden",
     "settings": "Einstellungen",
-    "search": "Bücher suchen...",
+    "search": "In meiner Bibliothek suchen...",
+    "searchCatalogPrompt": "Storytel-Katalog durchsuchen",
     "noBooks": "Keine Bücher gefunden",
     "emptyLibrary": "Ihre Bibliothek scheint leer zu sein.",
     "loading": "Bibliothek wird geladen...",
@@ -41,7 +46,13 @@
     "loadingBookData": "Buchdaten werden geladen...",
     "loadError": "Audiostream konnte nicht geladen werden",
     "loadChaptersError": "Kapitel konnten nicht geladen werden",
-    "loadBookmarksError": "Lesezeichen konnten nicht geladen werden"
+    "loadBookmarksError": "Lesezeichen konnten nicht geladen werden",
+    "sleepTimer": "Schlaf-Timer",
+    "endOfChapter": "Ende des Kapitels",
+    "off": "Aus",
+    "expand": "Vollständigen Player öffnen",
+    "volume": "Lautstärke",
+    "chapterOf": "Kapitel {{current}} von {{total}}"
   },
   "bookmarks": {
     "title": "Ihre Lesezeichen",
@@ -83,8 +94,22 @@
     "author": "Autor:",
     "narrator": "Sprecher:"
   },
+  "bookshelf": {
+    "remove": "Aus der Bibliothek entfernen",
+    "removeTitle": "Buch entfernen?",
+    "removeMessage": "„{{title}}“ wird aus Ihrer Storytel-Bibliothek entfernt. Sie können es jederzeit über die Suche wieder hinzufügen.",
+    "removeConfirm": "Entfernen",
+    "removed": "Aus Ihrer Bibliothek entfernt",
+    "errors": {
+      "removeFailed": "Das Buch konnte nicht aus Ihrer Bibliothek entfernt werden.",
+      "removeNotConfirmed": "Storytel hat die Anfrage angenommen, aber das Buch ist weiterhin in Ihrer Bibliothek."
+    }
+  },
   "bookView": {
     "saved": "Gespeichert",
+    "addToLibrary": "Zur Bibliothek hinzufügen",
+    "inLibrary": "In der Bibliothek",
+    "savedToLibrary": "Buch zu Ihrer Bibliothek hinzugefügt!",
     "listen": "Anhören",
     "language": "Sprache",
     "duration": "Dauer",
@@ -179,6 +204,16 @@
     "language": "Sprache",
     "languageAuto": "Auto"
   },
+  "language": {
+    "title": "Sprache",
+    "subtitle": "Wählen Sie die Sprache der Benutzeroberfläche.",
+    "auto": "Automatisch",
+    "autoDescription": "Systemsprache verwenden",
+    "autoResolved": "Folgt dem System · {{language}}",
+    "systemPreference": "Systemsprachen: {{languages}}",
+    "change": "Sprache ändern ({{language}})",
+    "catalogNote": "Dies ändert nur die Benutzeroberfläche. Welche Bücher Sie finden und in welchen Sprachen, bestimmt das Land Ihres Storytel-Kontos."
+  },
   "logs": {
     "title": "Anwendungsprotokolle",
     "refresh": "Aktualisieren",
@@ -195,9 +230,8 @@
   },
   "floatingMenu": {
     "library": "Bibliothek",
-    "search": "Storytel durchsuchen",
+    "search": "Storytel-Katalog durchsuchen",
     "player": "Player",
-    "logs": "Protokolle",
     "settings": "Einstellungen"
   },
   "search": {
@@ -215,6 +249,16 @@
     "ebook": "E-Book",
     "hours": "Std.",
     "minutes": "Min.",
-    "shortcut": "Drücken Sie ⌘K / Strg+K jederzeit"
+    "shortcut": "Drücken Sie ⌘K / Strg+K jederzeit",
+    "allLanguages": "Alle",
+    "filterByLanguage": "Sprache",
+    "autoFilterHint": "Nach Ihren Sprachen vorausgewählt. Wählen Sie „Alle“, um alle Ergebnisse zu sehen.",
+    "noResultsHint": "Prüfen Sie die Schreibweise oder versuchen Sie einen anderen Suchbegriff",
+    "noResultsInLanguages": "Keine Ergebnisse auf {{languages}}.",
+    "showAllLanguages": "Alle Sprachen anzeigen ({{total}})",
+    "errors": {
+      "addToBookshelfFailed": "Buch konnte nicht zur Bibliothek hinzugefügt werden. Es ist möglicherweise in der Region Ihres Kontos nicht verfügbar.",
+      "addToBookshelfNotConfirmed": "Storytel hat die Anfrage angenommen, das Buch ist aber nicht in deiner Bibliothek erschienen. Es ist möglicherweise nicht in deinem Abonnement enthalten."
+    }
   }
 }

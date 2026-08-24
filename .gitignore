@@ -12,3 +12,6 @@ downloads
 app.log
 *.log
 .DS_Store
+conversation*.md
+notes/
+.claude/

@@ -47,6 +47,8 @@ export interface SearchResultBook {
   description?: string;
   hasAbook: boolean;
   hasEbook: boolean;
+  language?: string;
+  languageName?: string;
 }
 
 const FIREBASE_TOKEN_URL = "https://securetoken.googleapis.com";
@@ -75,6 +77,7 @@ interface RawBookshelfModel {
   id: string;
   title: string;
   state: "CONSUMING" | "CONSUMED" | "WILL_CONSUME" | string;
+  stateUpdateTime?: string;
   kidsBook?: boolean;
   authors?: RawBookshelfNamedEntity[];
   narrators?: RawBookshelfNamedEntity[];
@@ -83,6 +86,9 @@ interface RawBookshelfModel {
 }
 
 interface RawBookshelfResponse {
+  // Opaque sync cursor. Echoed back on writes so the server can apply the
+  // delta against the state the client last saw.
+  resourceVersion?: string;
   items?: Record<string, { action: string; model: RawBookshelfModel }>;
   followingItems?: Record<string, unknown>;
   collections?: Record<string, unknown>;
@@ -94,6 +100,9 @@ interface RawBookshelfResponse {
 interface BookShelfEntity {
   id: string;
   status: number;
+  // Used by the frontend to sort the library by most recent activity.
+  stateUpdateTime?: string;
+  positionUpdatedTime?: string;
   book: {
     name: string;
     authorsAsString: string;
@@ -381,28 +390,65 @@ class StorytelClient {
     }
   }
 
-  async getBookshelf(): Promise<BookShelfResponse> {
-    const url = `https://api.storytel.net/libraries/bookshelf`;
+  // /libraries/bookshelf is a delta-sync endpoint: the body carries the client's
+  // local changes, the response carries the resulting state plus a
+  // `resourceVersion` cursor.
+  //
+  // Its schema is known from the server's own validation error:
+  //   expected=map[string]models.ConsumableActionRequest, field=items
+  // so `items` is a map keyed by consumable id. An array body is rejected 400.
+  private static readonly BOOKSHELF_URL =
+    "https://api.storytel.net/libraries/bookshelf";
 
-    try {
-      const bearer = await this.getApiBearer();
-      const response = await this.client.post<RawBookshelfResponse>(
-        url,
-        { items: [] },
-        {
-          headers: {
-            Authorization: `Bearer ${bearer}`,
-            "content-type": "application/x-www-form-urlencoded",
-            Accept: "*/*",
-          },
+  // Read the whole bookshelf. Sends an empty body, which the endpoint reads as
+  // "no local state, send me everything". Do not "fix" this into a JSON body
+  // such as {"items": []} — that is the 400 above.
+  private async fetchBookshelfSnapshot(): Promise<RawBookshelfResponse> {
+    const bearer = await this.getApiBearer();
+    const response = await this.client.post<RawBookshelfResponse>(
+      StorytelClient.BOOKSHELF_URL,
+      "",
+      {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "content-type": "application/x-www-form-urlencoded",
+          Accept: "*/*",
         },
-      );
+      },
+    );
+    return response.data;
+  }
+
+  // Push local changes. Must be real JSON: axios form-encodes plain objects
+  // when the request declares x-www-form-urlencoded, and the API discards such
+  // a body without ever failing the request.
+  private async postBookshelfDelta(
+    body: Record<string, unknown>,
+  ): Promise<RawBookshelfResponse> {
+    const bearer = await this.getApiBearer();
+    const response = await this.client.post<RawBookshelfResponse>(
+      StorytelClient.BOOKSHELF_URL,
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "content-type": "application/json",
+          Accept: "*/*",
+        },
+      },
+    );
+    return response.data;
+  }
+
+  async getBookshelf(): Promise<BookShelfResponse> {
+    try {
+      const data = await this.fetchBookshelfSnapshot();
 
       // The endpoint returns { items: { "<id>": { action, model } } } with a
       // shape that differs from the legacy getBookShelf.action response. Remap
       // each `model` onto the legacy BookShelfEntity keys so the existing
       // frontend keeps working unchanged.
-      const items = response.data?.items;
+      const items = data?.items;
       if (!items || typeof items !== "object") return { books: [] };
 
       // Library state -> legacy numeric status (1 = not started, 2 = in progress,
@@ -411,6 +457,10 @@ class StorytelClient {
         WILL_CONSUME: 1,
         CONSUMING: 2,
         CONSUMED: 3,
+        FINISHED: 3,
+        COMPLETED: 3,
+        READING: 2,
+        TO_READ: 1,
       };
 
       const books = Object.values(items)
@@ -430,9 +480,19 @@ class StorytelClient {
               .filter(Boolean)
               .join(", ");
 
+          const normalizedState = (model.state || "").toUpperCase();
+          let calculatedStatus = stateToStatus[normalizedState];
+          if (!calculatedStatus) {
+            if (abookFormat?.position?.position && abookFormat.position.position > 0) {
+              calculatedStatus = 2;
+            } else {
+              calculatedStatus = 1;
+            }
+          }
+
           return {
             id: model.id,
-            status: stateToStatus[model.state] ?? 1,
+            status: calculatedStatus,
             stateUpdateTime: model.stateUpdateTime,
             positionUpdatedTime: abookFormat?.position?.updatedTime,
             book: {
@@ -469,6 +529,53 @@ class StorytelClient {
     }
   }
 
+  private extractLanguageInfo(
+    model: any,
+    raw?: any,
+    item?: any
+  ): { language?: string; languageName?: string } {
+    const formats = Array.isArray(model?.formats)
+      ? model.formats
+      : Array.isArray(raw?.formats)
+      ? raw.formats
+      : [];
+
+    const formatLang = formats.find((f: any) => f?.language)?.language;
+
+    const langObj =
+      model?.language ||
+      (Array.isArray(model?.languages) && model.languages[0]) ||
+      formatLang ||
+      raw?.language ||
+      (Array.isArray(raw?.languages) && raw.languages[0]) ||
+      item?.language ||
+      item?.book?.language;
+
+    if (typeof langObj === "string") {
+      const clean = langObj.toLowerCase().trim();
+      return { language: clean };
+    }
+    if (langObj && typeof langObj === "object") {
+      const iso = (
+        langObj.isoValue ||
+        langObj.iso ||
+        langObj.code ||
+        langObj.id ||
+        ""
+      )
+        .toString()
+        .toLowerCase()
+        .trim();
+      const name =
+        langObj.localizedName || langObj.name || langObj.title || undefined;
+      return {
+        language: iso || undefined,
+        languageName: name,
+      };
+    }
+    return {};
+  }
+
   async searchCatalog(query: string): Promise<SearchResultBook[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
@@ -476,7 +583,70 @@ class StorytelClient {
     const results: SearchResultBook[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Try official storytel.com web search API (returns full catalog)
+    // 1. Try authenticated api.storytel.net search endpoints first
+    // This correctly scopes search results to the logged-in user's country/market
+    // and returns all available languages in their catalog (e.g. fi + sv + en).
+    try {
+      const bearer = await this.getApiBearer();
+      const headers = {
+        Authorization: `Bearer ${bearer}`,
+        Accept: "*/*",
+      };
+
+      const endpoints = [
+        `https://api.storytel.net/search/v2?query=${encodeURIComponent(trimmed)}&configVariant=default`,
+        `https://api.storytel.net/search/page?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
+        `https://api.storytel.net/search?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
+      ];
+
+      for (const url of endpoints) {
+        try {
+          const response = await this.client.get(url, { headers });
+          const rawItems = Array.isArray(response.data?.items)
+            ? response.data.items
+            : Array.isArray(response.data?.results)
+            ? response.data.results
+            : [];
+
+          for (const raw of rawItems) {
+            const model = raw.model || raw.item || raw.book || raw;
+            const id = String(model.id || model.consumableId || raw.id || raw.consumableId || "");
+            const title = model.title || model.name || raw.title || raw.name || "";
+            if (!id || !title || seenIds.has(id)) continue;
+            seenIds.add(id);
+
+            const formats: any[] = Array.isArray(model.formats) ? model.formats : [];
+            const abook = formats.find((f: any) => f.type === "abook");
+            const ebook = formats.find((f: any) => f.type === "ebook");
+            const coverUrl = abook?.cover?.url || ebook?.cover?.url || model.cover?.url || "";
+            const { language, languageName } = this.extractLanguageInfo(model, raw);
+
+            results.push({
+              id,
+              title,
+              authors: Array.isArray(model.authors) ? model.authors.map((a: any) => a?.name || a).join(", ") : "",
+              narrators: Array.isArray(model.narrators) ? model.narrators.map((n: any) => n?.name || n).join(", ") : "",
+              coverUrl,
+              category: model.category?.name || model.category?.title || "",
+              durationMs: abook?.durationInMilliseconds || 0,
+              description: model.description || "",
+              hasAbook: !!abook,
+              hasEbook: !!ebook,
+              language,
+              languageName,
+            });
+          }
+
+          if (results.length > 0) return results;
+        } catch {
+          // Try next api.storytel.net endpoint
+        }
+      }
+    } catch (err) {
+      console.warn("[storytelApi] api.storytel.net search failed, trying fallback:", err);
+    }
+
+    // 2. Fallback to storytel.com web search API if authenticated search returned 0 results
     try {
       const searchActionUrl = `https://www.storytel.com/api/search.action?q=${encodeURIComponent(trimmed)}`;
       const response = await this.client.get(searchActionUrl, {
@@ -520,6 +690,8 @@ class StorytelClient {
             ? Math.floor(Number(abook.time) / 1000000)
             : 0;
 
+          const { language, languageName } = this.extractLanguageInfo(book, item, item);
+
           results.push({
             id,
             title,
@@ -531,6 +703,8 @@ class StorytelClient {
             description: abook.description || ebook.description || "",
             hasAbook: !!abook.id || !!item.abook,
             hasEbook: !!ebook.id || !!item.ebook,
+            language,
+            languageName,
           });
         }
 
@@ -539,99 +713,259 @@ class StorytelClient {
         }
       }
     } catch (err) {
-      console.warn("[storytelApi] storytel.com search failed, trying fallback endpoints:", err);
-    }
-
-    // 2. Fallback to api.storytel.net endpoints if search.action yielded 0 results
-    try {
-      const bearer = await this.getApiBearer();
-      const headers = {
-        Authorization: `Bearer ${bearer}`,
-        Accept: "*/*",
-      };
-
-      const endpoints = [
-        `https://api.storytel.net/search/v2?query=${encodeURIComponent(trimmed)}&configVariant=default`,
-        `https://api.storytel.net/search/page?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
-        `https://api.storytel.net/search?query=${encodeURIComponent(trimmed)}&kidsMode=false`,
-      ];
-
-      for (const url of endpoints) {
-        try {
-          const response = await this.client.get(url, { headers });
-          const rawItems = Array.isArray(response.data?.items)
-            ? response.data.items
-            : Array.isArray(response.data?.results)
-            ? response.data.results
-            : [];
-
-          for (const raw of rawItems) {
-            const model = raw.model || raw.book || raw;
-            const id = String(model.id || model.consumableId || raw.id || "");
-            const title = model.title || model.name || raw.title || "";
-            if (!id || !title || seenIds.has(id)) continue;
-            seenIds.add(id);
-
-            const formats: any[] = Array.isArray(model.formats) ? model.formats : [];
-            const abook = formats.find((f: any) => f.type === "abook");
-            const ebook = formats.find((f: any) => f.type === "ebook");
-            const coverUrl = abook?.cover?.url || ebook?.cover?.url || model.cover?.url || "";
-
-            results.push({
-              id,
-              title,
-              authors: Array.isArray(model.authors) ? model.authors.map((a: any) => a?.name || a).join(", ") : "",
-              narrators: Array.isArray(model.narrators) ? model.narrators.map((n: any) => n?.name || n).join(", ") : "",
-              coverUrl,
-              category: model.category?.name || model.category?.title || "",
-              durationMs: abook?.durationInMilliseconds || 0,
-              description: model.description || "",
-              hasAbook: !!abook,
-              hasEbook: !!ebook,
-            });
-          }
-
-          if (results.length > 0) return results;
-        } catch {
-          // continue
-        }
-      }
-    } catch {
-      // ignore
+      console.warn("[storytelApi] storytel.com fallback search failed:", err);
     }
 
     return results;
   }
 
-  async addToBookshelf(consumableId: string): Promise<any> {
-    const url = `https://api.storytel.net/libraries/bookshelf`;
+  // True when a /libraries/bookshelf delta response explicitly contains the
+  // consumable. The endpoint keys `items` by consumable id, but tolerate an
+  // entry whose model carries the id instead.
+  private deltaContainsConsumable(data: any, consumableId: string): boolean {
+    const items = data?.items;
+    if (!items || typeof items !== "object" || Array.isArray(items)) {
+      return false;
+    }
+    return Object.entries(items).some(
+      ([key, entry]: [string, any]) =>
+        key === consumableId ||
+        String(entry?.model?.id ?? "") === consumableId,
+    );
+  }
+
+  // Re-read the bookshelf and check whether the consumable really landed there.
+  private async isOnBookshelf(consumableId: string): Promise<boolean> {
     try {
-      const bearer = await this.getApiBearer();
-      const response = await this.client.post(
-        url,
-        {
-          items: [
-            {
-              action: "ADD",
-              model: {
-                id: String(consumableId),
-              },
-            },
-          ],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${bearer}`,
-            "content-type": "application/x-www-form-urlencoded",
-            Accept: "*/*",
-          },
-        }
+      const { books } = await this.getBookshelf();
+      return books.some(
+        (entry) =>
+          String(entry.id) === consumableId ||
+          entry.book?.consumableId === consumableId,
       );
-      return response.data;
     } catch (error: any) {
       if (error.isStorytelUnauthorized) throw error;
-      throw new Error(`Failed to add book to bookshelf: ${error.message}`);
+      console.warn(
+        "[storytelApi] bookshelf verification read failed:",
+        error.message,
+      );
+      return false;
     }
+  }
+
+  /**
+   * Add a book to the user's Storytel bookshelf.
+   *
+   * `/libraries/bookshelf` is a JSON delta-sync endpoint. It answers 200 with
+   * the current bookshelf even for a body it could not parse, so a successful
+   * HTTP status proves nothing: every write is verified against the bookshelf
+   * before it is reported back as added.
+   */
+  // Build the `model` for a bookshelf item, mirroring the shape the endpoint
+  // itself returns for existing shelf entries. A "SET" carries the whole model,
+  // not a patch, so it is enriched from book-details when that call succeeds and
+  // degrades to the bare identity fields when it does not.
+  private async buildBookshelfModel(
+    consumableId: string,
+    state: string,
+    stateUpdateTime: string,
+  ): Promise<Record<string, unknown>> {
+    const base = {
+      id: consumableId,
+      state,
+      stateUpdateTime,
+      deepLink: `storytel://book-details-page/book-details/consumables/${consumableId}`,
+      resultType: "book",
+    };
+
+    try {
+      const details = await this.getBookDetails(consumableId);
+      return {
+        ...base,
+        title: details?.title ?? "",
+        shareUrl: details?.shareUrl ?? "",
+        kidsBook: !!details?.kidsBook,
+        authors: Array.isArray(details?.authors) ? details.authors : [],
+        narrators: Array.isArray(details?.narrators) ? details.narrators : [],
+        formats: Array.isArray(details?.formats) ? details.formats : [],
+        duration: details?.duration,
+        category: details?.category,
+        language: details?.language,
+      };
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      console.warn(
+        "[storytelApi] could not enrich bookshelf model, using minimal one:",
+        error.message,
+      );
+      return { ...base, kidsBook: false };
+    }
+  }
+
+  async addToBookshelf(
+    consumableId: string,
+  ): Promise<{ added: boolean; strategy: string | null }> {
+    const id = String(consumableId);
+    const now = new Date().toISOString();
+
+    // A delta is only meaningful relative to the cursor it was computed from,
+    // so start by reading the current state to pick up its resourceVersion.
+    let current: RawBookshelfResponse;
+    try {
+      current = await this.fetchBookshelfSnapshot();
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      const customError: any = new Error(
+        `Failed to add book to bookshelf: ${error.message}`,
+      );
+      customError.status = error.response?.status || 500;
+      throw customError;
+    }
+
+    if (this.deltaContainsConsumable(current, id)) {
+      return { added: true, strategy: "already-on-bookshelf" };
+    }
+
+    const resourceVersion = current.resourceVersion;
+    const model = await this.buildBookshelfModel(id, "WILL_CONSUME", now);
+
+    // `items` is map[consumableId] -> { action, model }, per the server's own
+    // schema validation error.
+    try {
+      // Only `items` is sent: omitting followingItems/collections keeps the
+      // delta narrow, so there is no way for an empty map to be read as
+      // "clear these".
+      const data = await this.postBookshelfDelta({
+        ...(resourceVersion ? { resourceVersion } : {}),
+        items: { [id]: { action: "SET", model } },
+      });
+      if (this.deltaContainsConsumable(data, id)) {
+        return { added: true, strategy: "sync-items-map" };
+      }
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      const detail =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message;
+      const customError: any = new Error(
+        `Failed to add book to bookshelf: ${detail}`,
+      );
+      customError.status = error.response?.status || 500;
+      throw customError;
+    }
+
+    // The response did not echo the book back; ask the bookshelf itself in case
+    // the write was applied asynchronously.
+    if (await this.isOnBookshelf(id)) {
+      return { added: true, strategy: "sync-verified" };
+    }
+
+    // Every request went through, but the book is still not on the shelf.
+    return { added: false, strategy: null };
+  }
+
+  // Storytel's delta protocol is not publicly documented. `SET` is confirmed by
+  // observation (it is what the app itself sends), but the verb for taking a
+  // book off the shelf is not, so try the plausible ones and let the bookshelf
+  // itself decide which worked. Nothing is reported as removed until a fresh
+  // read of the shelf no longer contains the book.
+  private static readonly REMOVE_ACTIONS = ["DELETE", "REMOVE", "UNSET"];
+
+  async removeFromBookshelf(
+    consumableId: string,
+  ): Promise<{ removed: boolean; strategy: string | null }> {
+    const id = String(consumableId);
+
+    let current: RawBookshelfResponse;
+    try {
+      current = await this.fetchBookshelfSnapshot();
+    } catch (error: any) {
+      if (error.isStorytelUnauthorized) throw error;
+      const customError: any = new Error(
+        `Failed to remove book from bookshelf: ${error.message}`,
+      );
+      customError.status = error.response?.status || 500;
+      throw customError;
+    }
+
+    if (!this.deltaContainsConsumable(current, id)) {
+      return { removed: true, strategy: "not-on-bookshelf" };
+    }
+
+    let resourceVersion = current.resourceVersion;
+    let lastError: any = null;
+
+    // Bare action first; a schema that insists on a model is handled by the
+    // final attempt, which reuses the same builder as addToBookshelf.
+    const attempts: { strategy: string; build: () => Promise<Record<string, unknown>> }[] =
+      StorytelClient.REMOVE_ACTIONS.map((action) => ({
+        strategy: action.toLowerCase(),
+        build: async () => ({ items: { [id]: { action } } }),
+      }));
+
+    attempts.push({
+      strategy: "delete-with-model",
+      build: async () => ({
+        items: {
+          [id]: {
+            action: "DELETE",
+            model: await this.buildBookshelfModel(
+              id,
+              "WILL_CONSUME",
+              new Date().toISOString(),
+            ),
+          },
+        },
+      }),
+    });
+
+    for (const attempt of attempts) {
+      let body: Record<string, unknown>;
+      try {
+        body = await attempt.build();
+      } catch (error: any) {
+        if (error.isStorytelUnauthorized) throw error;
+        lastError = error;
+        continue;
+      }
+
+      try {
+        await this.postBookshelfDelta({
+          ...(resourceVersion ? { resourceVersion } : {}),
+          ...body,
+        });
+      } catch (error: any) {
+        if (error.isStorytelUnauthorized) throw error;
+        // A rejected verb says nothing about the shelf itself - try the next.
+        lastError = error;
+        continue;
+      }
+
+      if (!(await this.isOnBookshelf(id))) {
+        return { removed: true, strategy: `sync-${attempt.strategy}` };
+      }
+
+      // The write was accepted but changed nothing. Refresh the cursor so the
+      // next delta is computed against the state the server actually has.
+      try {
+        resourceVersion = (await this.fetchBookshelfSnapshot()).resourceVersion;
+      } catch {
+        // Keep the previous cursor; the next attempt may still be accepted.
+      }
+    }
+
+    if (lastError && !lastError.response) {
+      const detail = lastError.message;
+      const customError: any = new Error(
+        `Failed to remove book from bookshelf: ${detail}`,
+      );
+      customError.status = 500;
+      throw customError;
+    }
+
+    // Every candidate was tried and the book is still on the shelf.
+    return { removed: false, strategy: null };
   }
 
   async getBookDetails(consumableId: string): Promise<any> {

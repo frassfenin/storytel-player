@@ -7,14 +7,13 @@ export const buildCoverUrl = (cover?: string | null): string => {
     return /^https?:\/\//.test(cover) ? cover : `https://www.storytel.com${cover}`;
 };
 
-// Turn an ISO language code (e.g. "de") into a name localized in the given UI
-// locale (e.g. "Deutsch"/"Tedesco"). Falls back to the raw code if unsupported.
 export const localizedLanguageName = (code?: string | null, uiLocale = 'en'): string => {
     if (!code) return '';
     try {
-        return new Intl.DisplayNames([uiLocale], {type: 'language'}).of(code) || code;
+        const name = new Intl.DisplayNames([uiLocale], {type: 'language'}).of(code) || code;
+        return name.charAt(0).toUpperCase() + name.slice(1);
     } catch {
-        return code;
+        return code.toUpperCase();
     }
 };
 
@@ -55,6 +54,20 @@ export const formatTimeNatural = (seconds: number) => {
 
     return parts.join(' ');
 };
+
+// Pick the translation key for a failed "add to library" call. The backend
+// reports a machine-readable `code` so the user-facing wording stays in the
+// i18n files instead of coming back as an untranslated server string.
+export const addToBookshelfErrorKey = (err: any): string =>
+    err?.response?.data?.code === 'ADD_TO_BOOKSHELF_NOT_CONFIRMED'
+        ? 'search.errors.addToBookshelfNotConfirmed'
+        : 'search.errors.addToBookshelfFailed';
+
+// Same idea for "remove from library".
+export const removeFromBookshelfErrorKey = (err: any): string =>
+    err?.response?.data?.code === 'REMOVE_FROM_BOOKSHELF_NOT_CONFIRMED'
+        ? 'bookshelf.errors.removeNotConfirmed'
+        : 'bookshelf.errors.removeFailed';
 
 export const truncateTitle = (title: string, maxLength: number = 30): string => {
     if (title.length <= maxLength) return title;

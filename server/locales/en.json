@@ -20,7 +20,8 @@
     "title": "My Library",
     "logout": "Logout",
     "settings": "Settings",
-    "search": "Search books...",
+    "search": "Search my library...",
+    "searchCatalogPrompt": "Search Storytel catalog",
     "noBooks": "No books found",
     "emptyLibrary": "Your library appears to be empty.",
     "loading": "Loading your library...",
@@ -45,7 +46,13 @@
     "loadingBookData": "Loading book data...",
     "loadError": "Failed to load audio stream",
     "loadChaptersError": "Failed to load chapters",
-    "loadBookmarksError": "Failed to load bookmarks"
+    "loadBookmarksError": "Failed to load bookmarks",
+    "sleepTimer": "Sleep Timer",
+    "endOfChapter": "End of chapter",
+    "off": "Off",
+    "expand": "Open full player",
+    "volume": "Volume",
+    "chapterOf": "Chapter {{current}} of {{total}}"
   },
   "bookmarks": {
     "title": "Your Bookmarks",
@@ -87,8 +94,22 @@
     "author": "Author:",
     "narrator": "Narrator:"
   },
+  "bookshelf": {
+    "remove": "Remove from library",
+    "removeTitle": "Remove book?",
+    "removeMessage": "“{{title}}” will be removed from your Storytel library. You can add it back from search at any time.",
+    "removeConfirm": "Remove",
+    "removed": "Removed from your library",
+    "errors": {
+      "removeFailed": "Could not remove the book from your library.",
+      "removeNotConfirmed": "Storytel accepted the request but the book is still in your library."
+    }
+  },
   "bookView": {
     "saved": "Saved",
+    "addToLibrary": "Add to Library",
+    "inLibrary": "In Library",
+    "savedToLibrary": "Book added to your library!",
     "listen": "Listen",
     "language": "Language",
     "duration": "Duration",
@@ -183,6 +204,16 @@
     "language": "Language",
     "languageAuto": "Auto"
   },
+  "language": {
+    "title": "Language",
+    "subtitle": "Choose the language of the app interface.",
+    "auto": "Automatic",
+    "autoDescription": "Follow the system language",
+    "autoResolved": "Follows the system · {{language}}",
+    "systemPreference": "System languages: {{languages}}",
+    "change": "Change language ({{language}})",
+    "catalogNote": "This changes the app interface only. Which books you can find, and in which languages, is decided by the country of your Storytel account."
+  },
   "logs": {
     "title": "Application Logs",
     "refresh": "Refresh",
@@ -199,9 +230,8 @@
   },
   "floatingMenu": {
     "library": "Library",
-    "search": "Search Storytel",
+    "search": "Search Storytel catalog",
     "player": "Player",
-    "logs": "Logs",
     "settings": "Settings"
   },
   "search": {
@@ -219,6 +249,16 @@
     "ebook": "E-book",
     "hours": "h",
     "minutes": "min",
-    "shortcut": "Press ⌘K / Ctrl+K anytime"
+    "shortcut": "Press ⌘K / Ctrl+K anytime",
+    "allLanguages": "All",
+    "filterByLanguage": "Language",
+    "autoFilterHint": "Pre-selected the languages you read. Choose “All” to see every result.",
+    "noResultsHint": "Check the spelling or try another search term",
+    "noResultsInLanguages": "No results in {{languages}}.",
+    "showAllLanguages": "Show all languages ({{total}})",
+    "errors": {
+      "addToBookshelfFailed": "Could not add book to library. It may not be available in your account's region.",
+      "addToBookshelfNotConfirmed": "Storytel accepted the request but the book did not appear in your library. It may not be included in your subscription."
+    }
   }
 }

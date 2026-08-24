@@ -5,11 +5,13 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   ReactNode,
 } from 'react';
 import api, { trackAction } from '../utils/api';
 import storage from '../utils/storage';
-import { BookShelfEntity } from '../interfaces/books';
+import { BookShelfEntity, BookMetaData } from '../interfaces/books';
+import { Chapter } from '../interfaces/chapters';
 import { BookmarkPositional } from '../interfaces/bookmarks';
 
 interface LocalPosition {
@@ -45,6 +47,14 @@ const writeLocalPosition = async (consumableId: string, position: number) => {
   }
 };
 
+export interface CurrentChapterInfo {
+  number: number;
+  title: string;
+  start: number;
+  end: number;
+  durationInSeconds?: number;
+}
+
 export interface AudioContextType {
   activeBook: BookShelfEntity | null;
   activeBookId: string | null;
@@ -58,6 +68,8 @@ export interface AudioContextType {
   volume: number;
   isMuted: boolean;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  chapters: Chapter[];
+  currentChapter: CurrentChapterInfo | null;
   loadBook: (book: BookShelfEntity | null, bookId: string, autoPlay?: boolean) => Promise<void>;
   togglePlayPause: () => void;
   seek: (seekTime: number) => void;
@@ -67,6 +79,10 @@ export interface AudioContextType {
   cyclePlaybackRate: () => void;
   setVolume: (newVolume: number) => void;
   toggleMute: () => void;
+  jumpToChapter: (startTime: number) => void;
+  sleepTimerRemaining: number | null;
+  sleepTimerMode: number | 'chapter' | null;
+  setSleepTimer: (option: number | 'chapter' | null) => void;
   error: string | null;
   setError: (err: string | null) => void;
 }
@@ -78,6 +94,7 @@ const PLAYBACK_RATES = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 export function AudioProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const positionUpdateIntervalRef = useRef<any>(null);
+  const sleepTimerIntervalRef = useRef<any>(null);
 
   const [activeBook, setActiveBook] = useState<BookShelfEntity | null>(null);
   const [activeBookId, setActiveBookId] = useState<string | null>(null);
@@ -92,6 +109,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [volume, setVolumeState] = useState(1.0);
   const [isMuted, setIsMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(1.0);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [sleepTimerRemaining, setSleepTimerRemaining] = useState<number | null>(null);
+  const [sleepTimerMode, setSleepTimerMode] = useState<number | 'chapter' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Position synchronization helper
@@ -143,10 +163,109 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Load chapters for active book
+  const loadChapters = useCallback(async (consumableId: string) => {
+    if (!consumableId) return;
+    try {
+      const response = await api.get<BookMetaData>(`/bookmetadata/${consumableId}`);
+      const rawChapters = response.data?.formats?.find((f) => f.type === 'abook')?.chapters || [];
+      setChapters(rawChapters);
+    } catch {
+      try {
+        const offline = await api.get<BookMetaData>(`/offline/bookmetadata/${consumableId}`);
+        const rawChapters = offline.data?.formats?.find((f) => f.type === 'abook')?.chapters || [];
+        setChapters(rawChapters);
+      } catch {
+        setChapters([]);
+      }
+    }
+  }, []);
+
+  // Compute current chapter from chapters list and currentTime
+  const currentChapter = useMemo<CurrentChapterInfo | null>(() => {
+    if (!chapters || chapters.length === 0) return null;
+    let cumulativeTime = 0;
+
+    for (let i = 0; i < chapters.length; i++) {
+      const chapter = chapters[i];
+      const durationSec = chapter.durationInSeconds || 0;
+      const chapterStart = cumulativeTime;
+      const chapterEnd = cumulativeTime + durationSec;
+
+      if (currentTime >= chapterStart && currentTime < chapterEnd) {
+        return {
+          number: chapter.number ?? (i + 1),
+          title: chapter.title || `Kapitel ${chapter.number ?? (i + 1)}`,
+          start: chapterStart,
+          end: chapterEnd,
+          durationInSeconds: durationSec,
+        };
+      }
+      cumulativeTime = chapterEnd;
+    }
+    return null;
+  }, [chapters, currentTime]);
+
+  const jumpToChapter = useCallback(
+    (startTime: number) => {
+      if (audioRef.current) {
+        audioRef.current.currentTime = startTime;
+        setCurrentTime(startTime);
+      }
+    },
+    []
+  );
+
+  // Sleep timer implementation
+  const setSleepTimer = useCallback((option: number | 'chapter' | null) => {
+    if (sleepTimerIntervalRef.current) {
+      clearInterval(sleepTimerIntervalRef.current);
+      sleepTimerIntervalRef.current = null;
+    }
+    setSleepTimerMode(option);
+
+    if (option === null) {
+      setSleepTimerRemaining(null);
+      return;
+    }
+
+    if (typeof option === 'number') {
+      const totalSeconds = option * 60;
+      setSleepTimerRemaining(totalSeconds);
+
+      sleepTimerIntervalRef.current = setInterval(() => {
+        setSleepTimerRemaining((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(sleepTimerIntervalRef.current);
+            sleepTimerIntervalRef.current = null;
+            if (audioRef.current) {
+              audioRef.current.pause();
+            }
+            setSleepTimerMode(null);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else if (option === 'chapter') {
+      setSleepTimerRemaining(null);
+    }
+  }, []);
+
   // Main book loader
   const loadBook = useCallback(
     async (book: BookShelfEntity | null, bookId: string, autoPlay: boolean = true) => {
       const consumableId = book?.book?.consumableId || bookId;
+
+      // Persist session to local storage for quick restore
+      storage
+        .set(
+          'last_played_session',
+          JSON.stringify({ book, bookId, consumableId })
+        )
+        .catch(() => {});
+
+      loadChapters(consumableId);
 
       // If this book is already active and stream is loaded, don't restart
       if (activeBookId === bookId && audioSrc) {
@@ -178,17 +297,51 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     },
-    [activeBookId, audioSrc, isPlaying]
+    [activeBookId, audioSrc, isPlaying, loadChapters]
   );
+
+  // Restore previous session on launch
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const raw = await storage.get('last_played_session');
+        if (!raw) return;
+        const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (saved?.bookId && !activeBookId) {
+          setActiveBook(saved.book || null);
+          setActiveBookId(saved.bookId);
+          const cid = saved.consumableId || saved.bookId;
+          setActiveConsumableId(cid);
+          if (saved.book?.abook?.time) {
+            setDuration(saved.book.abook.time / 1000000);
+          }
+          loadChapters(cid);
+          if (cid) {
+            const local = await readLocalPosition(cid);
+            if (local) {
+              setCurrentTime(Math.floor(local.position / 1000));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to restore last played session:', err);
+      }
+    };
+    restoreSession();
+  }, [loadChapters]);
 
   const togglePlayPause = useCallback(() => {
     if (!audioRef.current) return;
+    if (!audioSrc && activeBookId) {
+      loadBook(activeBook, activeBookId, true);
+      return;
+    }
     if (isPlaying) {
       audioRef.current.pause();
     } else {
       audioRef.current.play().catch(console.error);
     }
-  }, [isPlaying]);
+  }, [isPlaying, audioSrc, activeBookId, activeBook, loadBook]);
 
   const seek = useCallback((seekTime: number) => {
     if (!audioRef.current) return;
@@ -197,7 +350,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const skipForward = useCallback(
-    (seconds: number = 15) => {
+    (seconds: number = 30) => {
       if (audioRef.current) {
         const nextTime = Math.min(audioRef.current.currentTime + seconds, duration || audioRef.current.duration || Infinity);
         audioRef.current.currentTime = nextTime;
@@ -283,7 +436,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const onTimeUpdate = () => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+      const cur = audioRef.current.currentTime;
+      setCurrentTime(cur);
+      if (sleepTimerMode === 'chapter' && currentChapter && cur >= currentChapter.end - 0.5) {
+        audioRef.current.pause();
+        setSleepTimerMode(null);
+      }
     }
   };
 
@@ -317,6 +475,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       if (positionUpdateIntervalRef.current) {
         clearInterval(positionUpdateIntervalRef.current);
       }
+      if (sleepTimerIntervalRef.current) {
+        clearInterval(sleepTimerIntervalRef.current);
+      }
     };
   }, []);
 
@@ -335,6 +496,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         volume,
         isMuted,
         audioRef,
+        chapters,
+        currentChapter,
         loadBook,
         togglePlayPause,
         seek,
@@ -344,6 +507,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         cyclePlaybackRate,
         setVolume,
         toggleMute,
+        jumpToChapter,
+        sleepTimerRemaining,
+        sleepTimerMode,
+        setSleepTimer,
         error,
         setError,
       }}

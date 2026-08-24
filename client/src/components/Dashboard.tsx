@@ -1,12 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
 import BookCard from './BookCard';
 import LoadingState from './LoadingState';
 import ErrorState from './ErrorState';
-import DashboardHeader from './DashboardHeader';
+import ConfirmRemoveBookModal from './ConfirmRemoveBookModal';
 import { BookShelfEntity, BookShelfResponse } from '../interfaces/books';
+import { removeFromBookshelfErrorKey } from '../utils/helpers';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -14,32 +15,100 @@ interface DashboardProps {
   setTriggerLogout?: (value: boolean) => void;
 }
 
-function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps) {
+export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [books, setBooks] = useState<BookShelfEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState<number | null>(null);
-  const [filteredBooks, setFilteredBooks] = useState<BookShelfEntity[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [bookToRemove, setBookToRemove] = useState<BookShelfEntity | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadBookshelf();
+    const handleUpdate = () => {
+      setFilterStatus(null);
+      setSearchQuery('');
+      loadBookshelf();
+    };
+    window.addEventListener('bookshelfUpdated', handleUpdate);
+    return () => {
+      window.removeEventListener('bookshelfUpdated', handleUpdate);
+    };
   }, []);
 
-  useEffect(() => {
-    if (books.length === 0) {
-      setFilteredBooks([]);
-      return;
+  const loadBookshelf = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get<BookShelfResponse>('/bookshelf');
+      setBooks(response.data.books || []);
+    } catch (err: any) {
+      try {
+        const offline = await api.get<BookShelfResponse>('/offline/bookshelf');
+        setBooks(offline.data?.books || []);
+      } catch {
+        setError(err.response?.data?.error || t('dashboard.loadError', 'Kunde inte ladda bokhyllan'));
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Status counts
+  const counts = useMemo(() => {
+    let notStarted = 0;
+    let started = 0;
+    let concluded = 0;
+
+    for (const b of books) {
+      const s = +b.status;
+      const pos = b.abookMark?.pos || 0;
+      if (s === 3) {
+        concluded += 1;
+      } else if (s === 2 || (pos > 0 && s !== 3)) {
+        started += 1;
+      } else {
+        notStarted += 1;
+      }
+    }
+
+    return {
+      all: books.length,
+      notStarted,
+      started,
+      concluded,
+    };
+  }, [books]);
+
+  // Filtered and sorted books
+  const filteredBooks = useMemo(() => {
+    if (books.length === 0) return [];
 
     let result = [...books];
 
     // Filter by status if selected
     if (filterStatus !== null) {
-      result = result.filter((book) => +book.status === filterStatus);
+      result = result.filter((book) => {
+        const s = +book.status;
+        const pos = book.abookMark?.pos || 0;
+        if (filterStatus === 1) {
+          return s === 1 && pos === 0;
+        }
+        if (filterStatus === 2) {
+          return s === 2 || (pos > 0 && s !== 3);
+        }
+        if (filterStatus === 3) {
+          return s === 3;
+        }
+        return s === filterStatus;
+      });
     }
 
     // Filter by local search query
@@ -63,25 +132,8 @@ function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps
       return getTimestamp(b) - getTimestamp(a);
     });
 
-    setFilteredBooks(result);
-  }, [filterStatus, books, searchQuery]);
-
-  const loadBookshelf = async () => {
-    try {
-      setIsLoading(true);
-      const response = await api.get<BookShelfResponse>('/bookshelf');
-      setBooks(response.data.books || []);
-    } catch (err: any) {
-      try {
-        const offline = await api.get<BookShelfResponse>('/offline/bookshelf');
-        setBooks(offline.data?.books || []);
-      } catch {
-        setError(err.response?.data?.error || t('dashboard.loadError', 'Kunde inte ladda bokhyllan'));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return result;
+  }, [books, filterStatus, searchQuery]);
 
   const handleBookSelect = (book: BookShelfEntity) => {
     const bookId = book.abook?.id || book.id;
@@ -90,8 +142,32 @@ function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps
     });
   };
 
-  const handleFilterToggle = (status: number) => {
-    setFilterStatus((prev) => (prev === status ? null : status));
+  const handleQuickPlay = (e: React.MouseEvent, book: BookShelfEntity) => {
+    e.stopPropagation();
+    const bookId = book.abook?.id || book.id;
+    navigate(`/player/${bookId}`);
+  };
+
+  const handleRemoveBook = async () => {
+    if (!bookToRemove || isRemoving) return;
+    const consumableId = bookToRemove.book?.consumableId || bookToRemove.id;
+    if (!consumableId) return;
+
+    try {
+      setIsRemoving(true);
+      await api.post('/bookshelf/remove', { consumableId: String(consumableId) });
+      setBookToRemove(null);
+      setBooks((prev) => prev.filter((b) => b !== bookToRemove));
+      setToastMessage({ type: 'success', text: t('bookshelf.removed', 'Boken togs bort från bokhyllan') });
+      loadBookshelf();
+    } catch (err: any) {
+      console.error('Failed to remove book from bookshelf:', err);
+      setBookToRemove(null);
+      setToastMessage({ type: 'error', text: t(removeFromBookshelfErrorKey(err)) });
+    } finally {
+      setIsRemoving(false);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
   };
 
   if (isLoading) {
@@ -101,91 +177,101 @@ function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps
   if (error) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] text-white">
-        <DashboardHeader
-          onLogout={onLogout}
-          triggerLogout={triggerLogout}
-          setTriggerLogout={setTriggerLogout}
-        />
         <ErrorState error={error} onRetry={() => window.location.reload()} onLogout={onLogout} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-[#FF5100] selection:text-white">
-      <DashboardHeader
-        onLogout={onLogout}
-        triggerLogout={triggerLogout}
-        setTriggerLogout={setTriggerLogout}
-      />
+    <div className="flex-1 bg-[#0A0A0A] text-white selection:bg-[#FF5100] selection:text-white overflow-y-auto custom-scrollbar">
+      <main className="max-w-7xl mx-auto py-7 px-6 pb-28">
+        {/* Top Header & Search Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+              <span>{t('dashboard.title', 'Bokhylla')}</span>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#1A1A1A] border border-white/10 text-gray-400">
+                {books.length} {books.length === 1 ? 'bok' : 'böcker'}
+              </span>
+            </h1>
+          </div>
 
-      {/* Main Container */}
-      <main className="max-w-4xl mx-auto py-6 px-4 pb-36">
-        {/* Search Bar */}
-        <div className="relative mb-5">
-          <div className="relative flex items-center bg-[#1A1A1A] border border-[#2C2C2E] focus-within:border-[#FF5100]/60 focus-within:ring-1 focus-within:ring-[#FF5100]/30 rounded-2xl px-4 py-3.5 transition-all shadow-inner">
-            <svg
-              className="w-5 h-5 text-gray-400 flex-shrink-0 mr-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-              />
-            </svg>
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('dashboard.search', 'Sök böcker...')}
-              className="w-full bg-transparent text-white placeholder-gray-500 text-sm focus:outline-none"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-gray-400 hover:text-white ml-2 p-1 rounded-full hover:bg-white/10"
+          {/* Quick filter in library */}
+          <div className="relative w-full md:w-72">
+            <div className="relative flex items-center bg-[#1A1A1A] border border-white/[0.08] focus-within:border-[#FF5100]/60 focus-within:ring-1 focus-within:ring-[#FF5100]/30 rounded-xl px-3.5 h-10 transition-all shadow-inner">
+              <svg
+                className="w-4 h-4 text-gray-400 flex-shrink-0 mr-2.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filtrera i bokhyllan..."
+                className="w-full bg-transparent text-white placeholder-gray-500 text-xs focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-gray-400 hover:text-white ml-1.5 p-1 rounded-full hover:bg-white/10"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-2.5 mb-6 overflow-x-auto pb-1 no-scrollbar">
+        {/* Filter Status Tabs */}
+        <div className="flex items-center gap-2 mb-7 overflow-x-auto pb-1 no-scrollbar border-b border-white/[0.06] pt-1">
           {[
-            { status: 1, label: 'Ej påbörjad', i18nKey: 'dashboard.filters.notStarted' },
-            { status: 2, label: 'Påbörjad', i18nKey: 'dashboard.filters.started' },
-            { status: 3, label: 'Avslutad', i18nKey: 'dashboard.filters.concluded' },
-          ].map(({ status, label, i18nKey }) => {
+            { status: null, label: 'Alla', count: counts.all },
+            { status: 2, label: t('dashboard.filters.started', 'Påbörjad'), count: counts.started },
+            { status: 1, label: t('dashboard.filters.notStarted', 'Ej påbörjad'), count: counts.notStarted },
+            { status: 3, label: t('dashboard.filters.concluded', 'Avslutad'), count: counts.concluded },
+          ].map(({ status, label, count }) => {
             const isActive = filterStatus === status;
             return (
               <button
-                key={status}
-                onClick={() => handleFilterToggle(status)}
-                className={`px-5 py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                key={String(status)}
+                type="button"
+                onClick={() => setFilterStatus(status)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all select-none ${
                   isActive
-                    ? 'bg-[#2C2C2E] text-white border border-white/25 shadow-md'
-                    : 'bg-[#141414] text-gray-400 hover:text-white hover:bg-[#1A1A1A] border border-white/5'
+                    ? 'bg-[#FF5100]/15 text-[#FF5100] border border-[#FF5100]/40 shadow-sm'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                {t(i18nKey, label)}
+                <span>{label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isActive ? 'bg-[#FF5100] text-white' : 'bg-[#222225] text-gray-400'
+                  }`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
         </div>
 
-        {/* Book List */}
+        {/* Book Grid */}
         {books.length === 0 ? (
-          <div className="text-center py-20 bg-[#141414] border border-white/5 rounded-3xl p-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-900 rounded-full flex items-center justify-center text-gray-500">
+          <div className="text-center py-20 bg-[#141414] border border-white/[0.06] rounded-3xl p-8 max-w-lg mx-auto shadow-2xl">
+            <div className="w-16 h-16 mx-auto mb-4 bg-white/[0.04] border border-white/[0.08] rounded-2xl flex items-center justify-center text-gray-500">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -195,22 +281,36 @@ function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps
                 />
               </svg>
             </div>
-            <div className="text-white text-lg font-semibold mb-1">
+            <h3 className="text-white text-lg font-bold mb-1">
               {t('dashboard.noBooks', 'Inga böcker i bokhyllan')}
-            </div>
-            <p className="text-gray-400 text-sm">{t('dashboard.emptyLibrary', 'Sök efter en bok för att börja lyssna')}</p>
+            </h3>
+            <p className="text-gray-400 text-xs max-w-sm mx-auto mb-5">
+              {t('dashboard.emptyLibrary', 'Sök efter en bok i Storytels katalog för att börja lyssna')}
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/search')}
+              className="px-5 py-2.5 rounded-xl bg-[#FF5100] text-white text-xs font-bold shadow-lg shadow-[#FF5100]/30 hover:brightness-110 active:scale-95 transition-all"
+            >
+              Utforska katalogen (⌘K)
+            </button>
           </div>
         ) : filteredBooks.length === 0 ? (
-          <div className="text-center py-16 bg-[#141414] border border-white/5 rounded-3xl p-8">
-            <p className="text-gray-400 text-sm mb-4">Inga böcker matchade ditt filter eller din sökning.</p>
-            {searchQuery && (
-              <p className="text-xs text-gray-500">
-                Tips: Använd sökknappen 🔍 i menyn längst ner för att söka i hela Storytels katalog.
-              </p>
-            )}
+          <div className="text-center py-16 bg-[#141414] border border-white/[0.06] rounded-3xl p-8 space-y-3 max-w-lg mx-auto shadow-xl">
+            <p className="text-gray-300 text-sm font-medium">Inga böcker matchade ditt filter.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterStatus(null);
+                setSearchQuery('');
+              }}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-white font-semibold transition-all"
+            >
+              Återställ filter
+            </button>
           </div>
         ) : (
-          <div className="space-y-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
             {filteredBooks
               .filter((book) => !!book?.abook || !!book?.book)
               .map((book) => (
@@ -218,11 +318,33 @@ function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: DashboardProps
                   key={book.abook?.id || book.id || book.book?.consumableId}
                   book={book}
                   onBookSelect={handleBookSelect}
+                  onRemove={setBookToRemove}
+                  onQuickPlay={handleQuickPlay}
                 />
               ))}
           </div>
         )}
       </main>
+
+      <ConfirmRemoveBookModal
+        isOpen={!!bookToRemove}
+        bookTitle={bookToRemove?.book?.name || ''}
+        isRemoving={isRemoving}
+        onConfirm={handleRemoveBook}
+        onCancel={() => setBookToRemove(null)}
+      />
+
+      {toastMessage && (
+        <div
+          className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl text-xs font-medium shadow-2xl backdrop-blur-md border animate-in fade-in slide-in-from-bottom-2 ${
+            toastMessage.type === 'success'
+              ? 'bg-green-950/90 text-green-300 border-green-700/50'
+              : 'bg-red-950/90 text-red-300 border-red-700/50'
+          }`}
+        >
+          {toastMessage.text}
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,10 @@
     "password": "Contraseña",
     "signIn": "Iniciar sesión",
     "signingIn": "Iniciando sesión...",
+    "ssoDivider": "o",
+    "ssoGoogle": "Continuar con Google",
+    "ssoApple": "Continuar con Apple",
+    "ssoOpening": "Abriendo inicio de sesión de Storytel...",
     "errors": {
       "required": "Por favor, introduce tanto el correo electrónico como la contraseña",
       "failed": "Error al iniciar sesión",
@@ -16,7 +20,8 @@
     "title": "Mi Biblioteca",
     "logout": "Cerrar sesión",
     "settings": "Configuración",
-    "search": "Buscar libros...",
+    "search": "Buscar en mi biblioteca...",
+    "searchCatalogPrompt": "Buscar en el catálogo de Storytel",
     "noBooks": "No se encontraron libros",
     "emptyLibrary": "Tu biblioteca parece estar vacía.",
     "loading": "Cargando tu biblioteca...",
@@ -41,7 +46,13 @@
     "loadingBookData": "Cargando datos del libro...",
     "loadError": "Error al cargar el flujo de audio",
     "loadChaptersError": "Error al cargar los capítulos",
-    "loadBookmarksError": "Error al cargar los marcadores"
+    "loadBookmarksError": "Error al cargar los marcadores",
+    "sleepTimer": "Temporizador de apagado",
+    "endOfChapter": "Fin del capítulo",
+    "off": "Desactivado",
+    "expand": "Abrir reproductor completo",
+    "volume": "Volumen",
+    "chapterOf": "Capítulo {{current}} de {{total}}"
   },
   "bookmarks": {
     "title": "Tus Marcadores",
@@ -83,8 +94,22 @@
     "author": "Autor:",
     "narrator": "Narrador:"
   },
+  "bookshelf": {
+    "remove": "Quitar de la biblioteca",
+    "removeTitle": "¿Quitar el libro?",
+    "removeMessage": "«{{title}}» se quitará de tu biblioteca de Storytel. Puedes volver a añadirlo desde la búsqueda cuando quieras.",
+    "removeConfirm": "Quitar",
+    "removed": "Quitado de tu biblioteca",
+    "errors": {
+      "removeFailed": "No se pudo quitar el libro de tu biblioteca.",
+      "removeNotConfirmed": "Storytel aceptó la solicitud pero el libro sigue en tu biblioteca."
+    }
+  },
   "bookView": {
     "saved": "Guardado",
+    "addToLibrary": "Añadir a la biblioteca",
+    "inLibrary": "En la biblioteca",
+    "savedToLibrary": "¡Libro añadido a tu biblioteca!",
     "listen": "Escuchar",
     "language": "Idioma",
     "duration": "Duración",
@@ -179,6 +204,16 @@
     "language": "Idioma",
     "languageAuto": "Auto"
   },
+  "language": {
+    "title": "Idioma",
+    "subtitle": "Elige el idioma de la interfaz de la aplicación.",
+    "auto": "Automático",
+    "autoDescription": "Seguir el idioma del sistema",
+    "autoResolved": "Sigue al sistema · {{language}}",
+    "systemPreference": "Idiomas del sistema: {{languages}}",
+    "change": "Cambiar idioma ({{language}})",
+    "catalogNote": "Esto solo cambia la interfaz de la aplicación. Qué libros puedes encontrar, y en qué idiomas, lo decide el país de tu cuenta de Storytel."
+  },
   "logs": {
     "title": "Registros de la aplicación",
     "refresh": "Actualizar",
@@ -195,9 +230,8 @@
   },
   "floatingMenu": {
     "library": "Biblioteca",
-    "search": "Buscar en Storytel",
+    "search": "Buscar en el catálogo de Storytel",
     "player": "Reproductor",
-    "logs": "Registros",
     "settings": "Ajustes"
   },
   "search": {
@@ -215,6 +249,16 @@
     "ebook": "Libro electrónico",
     "hours": "h",
     "minutes": "min",
-    "shortcut": "Presiona ⌘K / Ctrl+K en cualquier momento"
+    "shortcut": "Presiona ⌘K / Ctrl+K en cualquier momento",
+    "allLanguages": "Todos",
+    "filterByLanguage": "Idioma",
+    "autoFilterHint": "Preseleccionado según tus idiomas. Elige «Todos» para ver todos los resultados.",
+    "noResultsHint": "Comprueba la ortografía o prueba otro término de búsqueda",
+    "noResultsInLanguages": "Sin resultados en {{languages}}.",
+    "showAllLanguages": "Mostrar todos los idiomas ({{total}})",
+    "errors": {
+      "addToBookshelfFailed": "No se pudo añadir el libro a la biblioteca. Es posible que no esté disponible en la región de su cuenta.",
+      "addToBookshelfNotConfirmed": "Storytel aceptó la solicitud pero el libro no apareció en tu biblioteca. Es posible que no esté incluido en tu suscripción."
+    }
   }
 }

@@ -183,6 +183,8 @@ export interface SearchResultBook {
     description?: string
     hasAbook: boolean
     hasEbook: boolean
+    language?: string
+    languageName?: string
 }
 
 export interface SearchResponse {
