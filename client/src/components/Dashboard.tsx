@@ -54,7 +54,7 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
         const offline = await api.get<BookShelfResponse>('/offline/bookshelf');
         setBooks(offline.data?.books || []);
       } catch {
-        setError(err.response?.data?.error || t('dashboard.loadError', 'Kunde inte ladda bokhyllan'));
+        setError(err.response?.data?.error || t('dashboard.loadError', 'Failed to load bookshelf'));
       }
     } finally {
       setIsLoading(false);
@@ -145,7 +145,9 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
   const handleQuickPlay = (e: React.MouseEvent, book: BookShelfEntity) => {
     e.stopPropagation();
     const bookId = book.abook?.id || book.id;
-    navigate(`/player/${bookId}`);
+    navigate(`/player/${bookId}`, {
+      state: { book, autoPlay: true },
+    });
   };
 
   const handleRemoveBook = async () => {
@@ -158,7 +160,7 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
       await api.post('/bookshelf/remove', { consumableId: String(consumableId) });
       setBookToRemove(null);
       setBooks((prev) => prev.filter((b) => b !== bookToRemove));
-      setToastMessage({ type: 'success', text: t('bookshelf.removed', 'Boken togs bort från bokhyllan') });
+      setToastMessage({ type: 'success', text: t('bookshelf.removed', 'Removed from your library') });
       loadBookshelf();
     } catch (err: any) {
       console.error('Failed to remove book from bookshelf:', err);
@@ -171,7 +173,7 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
   };
 
   if (isLoading) {
-    return <LoadingState message={t('dashboard.loading', 'Laddar bokhylla...')} />;
+    return <LoadingState message={t('dashboard.loading', 'Loading your library...')} />;
   }
 
   if (error) {
@@ -189,9 +191,9 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
-              <span>{t('dashboard.title', 'Bokhylla')}</span>
+              <span>{t('dashboard.title', 'My Library')}</span>
               <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#1A1A1A] border border-white/10 text-gray-400">
-                {books.length} {books.length === 1 ? 'bok' : 'böcker'}
+                {t('dashboard.bookCount', { count: books.length })}
               </span>
             </h1>
           </div>
@@ -217,7 +219,7 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filtrera i bokhyllan..."
+                placeholder={t('dashboard.search', 'Search my library...')}
                 className="w-full bg-transparent text-white placeholder-gray-500 text-xs focus:outline-none"
               />
               {searchQuery && (
@@ -239,9 +241,9 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
         <div className="flex items-center gap-2 mb-7 overflow-x-auto pb-1 no-scrollbar border-b border-white/[0.06] pt-1">
           {[
             { status: null, label: 'Alla', count: counts.all },
-            { status: 2, label: t('dashboard.filters.started', 'Påbörjad'), count: counts.started },
-            { status: 1, label: t('dashboard.filters.notStarted', 'Ej påbörjad'), count: counts.notStarted },
-            { status: 3, label: t('dashboard.filters.concluded', 'Avslutad'), count: counts.concluded },
+            { status: 2, label: t('dashboard.filters.started', 'Started'), count: counts.started },
+            { status: 1, label: t('dashboard.filters.notStarted', 'Not started'), count: counts.notStarted },
+            { status: 3, label: t('dashboard.filters.concluded', 'Concluded'), count: counts.concluded },
           ].map(({ status, label, count }) => {
             const isActive = filterStatus === status;
             return (
@@ -282,22 +284,22 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
               </svg>
             </div>
             <h3 className="text-white text-lg font-bold mb-1">
-              {t('dashboard.noBooks', 'Inga böcker i bokhyllan')}
+              {t('dashboard.noBooks', 'No books found')}
             </h3>
             <p className="text-gray-400 text-xs max-w-sm mx-auto mb-5">
-              {t('dashboard.emptyLibrary', 'Sök efter en bok i Storytels katalog för att börja lyssna')}
+              {t('dashboard.emptyLibrary', 'Your library appears to be empty.')}
             </p>
             <button
               type="button"
               onClick={() => navigate('/search')}
               className="px-5 py-2.5 rounded-xl bg-[#FF5100] text-white text-xs font-bold shadow-lg shadow-[#FF5100]/30 hover:brightness-110 active:scale-95 transition-all"
             >
-              Utforska katalogen (⌘K)
+              {t('dashboard.exploreCatalog', 'Explore the catalog (⌘K)')}
             </button>
           </div>
         ) : filteredBooks.length === 0 ? (
           <div className="text-center py-16 bg-[#141414] border border-white/[0.06] rounded-3xl p-8 space-y-3 max-w-lg mx-auto shadow-xl">
-            <p className="text-gray-300 text-sm font-medium">Inga böcker matchade ditt filter.</p>
+            <p className="text-gray-300 text-sm font-medium">{t('dashboard.noFilterMatch', 'No books matched your filter.')}</p>
             <button
               type="button"
               onClick={() => {
@@ -306,7 +308,7 @@ export function Dashboard({ onLogout, triggerLogout, setTriggerLogout }: Dashboa
               }}
               className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-white font-semibold transition-all"
             >
-              Återställ filter
+              {t('dashboard.resetFilters', 'Reset filters')}
             </button>
           </div>
         ) : (

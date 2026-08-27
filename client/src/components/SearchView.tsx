@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
 import { SearchResultBook, SearchResponse } from '../interfaces/books';
 import { addToBookshelfErrorKey, localizedLanguageName } from '../utils/helpers';
-import SearchFilterRail, { FormatFilter, DurationFilter, LanguageStat } from './SearchFilterRail';
+import SearchFilterRail, { DurationFilter, LanguageStat } from './SearchFilterRail';
 import SearchResultList, { SortOption } from './SearchResultList';
 import SearchPreviewPane from './SearchPreviewPane';
 
@@ -25,7 +25,6 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
 
   // Filters state
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]); // empty = all
-  const [selectedFormat, setSelectedFormat] = useState<FormatFilter>('all');
   const [selectedDuration, setSelectedDuration] = useState<DurationFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('relevance');
 
@@ -93,7 +92,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
     for (const book of rawResults) {
       if (!book.language) continue;
       const iso = book.language.toLowerCase();
-      const name = localizedLanguageName(iso, i18n.language) || iso.toUpperCase();
+      const name = localizedLanguageName(iso, i18n.language, book.languageName) || iso.toUpperCase();
       if (!counts[iso]) {
         counts[iso] = { iso, name, count: 0 };
       }
@@ -111,14 +110,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
       list = list.filter((b) => selectedLanguages.includes((b.language || '').toLowerCase()));
     }
 
-    // 2. Format Filter
-    if (selectedFormat === 'abook') {
-      list = list.filter((b) => b.hasAbook);
-    } else if (selectedFormat === 'ebook') {
-      list = list.filter((b) => b.hasEbook);
-    }
-
-    // 3. Duration Filter
+    // 2. Duration Filter
     if (selectedDuration === 'under5') {
       list = list.filter((b) => b.durationMs > 0 && b.durationMs < 5 * 3600 * 1000);
     } else if (selectedDuration === '5to15') {
@@ -129,7 +121,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
       list = list.filter((b) => b.durationMs > 15 * 3600 * 1000);
     }
 
-    // 4. Sort
+    // 3. Sort
     if (sortBy === 'title') {
       list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     } else if (sortBy === 'duration') {
@@ -137,7 +129,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
     }
 
     return list;
-  }, [rawResults, selectedLanguages, selectedFormat, selectedDuration, sortBy]);
+  }, [rawResults, selectedLanguages, selectedDuration, sortBy]);
 
   // Keep selectedBook valid after filter changes
   useEffect(() => {
@@ -163,7 +155,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
 
   const handlePlayBook = (e: React.MouseEvent | null, bookId: string) => {
     if (e) e.stopPropagation();
-    navigate(`/player/${bookId}`);
+    navigate(`/player/${bookId}`, { state: { autoPlay: true } });
   };
 
   const handleAddToLibrary = async (e: React.MouseEvent | null, bookId: string) => {
@@ -177,7 +169,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
       window.dispatchEvent(new Event('bookshelfUpdated'));
       setToastMessage({
         type: 'success',
-        text: t('search.addedToBookshelf', 'Tillagd i bokhyllan'),
+        text: t('search.addedToBookshelf', 'Added to Library'),
       });
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err: any) {
@@ -222,8 +214,6 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
         selectedLanguages={selectedLanguages}
         onToggleLanguage={handleToggleLanguage}
         onSelectAllLanguages={() => setSelectedLanguages([])}
-        selectedFormat={selectedFormat}
-        onChangeFormat={setSelectedFormat}
         selectedDuration={selectedDuration}
         onChangeDuration={setSelectedDuration}
         totalHits={rawResults.length}
@@ -233,7 +223,7 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
       {isLoading && rawResults.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0A0A0A]">
           <div className="w-8 h-8 border-2 border-[#FF5100] border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm font-medium text-gray-400">{t('search.searching', 'Söker i katalogen...')}</p>
+          <p className="text-sm font-medium text-gray-400">{t('search.searching', 'Searching...')}</p>
         </div>
       ) : !activeQuery.trim() ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0A0A0A]">
@@ -242,9 +232,9 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <h3 className="text-base font-bold text-white mb-1">{t('search.title', 'Hae Storytelistä')}</h3>
+          <h3 className="text-base font-bold text-white mb-1">{t('search.title', 'Search Storytel')}</h3>
           <p className="text-xs text-gray-500 max-w-sm">
-            {t('search.initialPrompt', 'Kirjoita hakeaksesi Storytelin laajasta äänikirjavalikoimasta')}
+            {t('search.initialPrompt', "Type to search Storytel's vast catalog of audiobooks")}
           </p>
         </div>
       ) : rawResults.length === 0 ? (
@@ -255,25 +245,24 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
             </svg>
           </div>
           <h3 className="text-base font-bold text-white mb-1">
-            {t('search.noResults', 'Inga böcker hittades för')} ”{activeQuery}”
+            {t('search.noResults', 'No books found for')} ”{activeQuery}”
           </h3>
           <p className="text-xs text-gray-500 max-w-sm">
-            {t('search.noResultsHint', 'Kontrollera stavningen eller prova ett annat sökord')}
+            {t('search.noResultsHint', 'Check the spelling or try another search term')}
           </p>
         </div>
       ) : filteredResults.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0A0A0A]">
-          <h3 className="text-sm font-bold text-white mb-2">Inga träffar med valda filter</h3>
+          <h3 className="text-sm font-bold text-white mb-2">{t('search.noFilterMatch', 'No matches with the selected filters')}</h3>
           <button
             type="button"
             onClick={() => {
               setSelectedLanguages([]);
-              setSelectedFormat('all');
               setSelectedDuration('all');
             }}
             className="px-4 py-2 rounded-xl bg-[#FF5100] text-white text-xs font-semibold shadow-md shadow-[#FF5100]/25 hover:brightness-110 transition-all"
           >
-            {t('search.showAllLanguages', 'Visa alla')} ({rawResults.length})
+            {t('search.showAllLanguages', { total: rawResults.length })}
           </button>
         </div>
       ) : (

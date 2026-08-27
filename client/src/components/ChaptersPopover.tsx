@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Chapter } from '../interfaces/chapters';
 import { CurrentChapterInfo } from '../contexts/AudioContext';
@@ -18,9 +18,17 @@ export function ChaptersPopover({
   onClose,
 }: ChaptersPopoverProps) {
   const { t } = useTranslation();
+  const currentChapterRef = useRef<HTMLButtonElement>(null);
 
   const currentNumber = currentChapter?.number ?? 1;
   const totalCount = chapters.length;
+
+  // Auto-scroll current chapter into view on mount
+  useEffect(() => {
+    if (currentChapterRef.current) {
+      currentChapterRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, []);
 
   return (
     <div
@@ -30,11 +38,11 @@ export function ChaptersPopover({
       {/* Header Row */}
       <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/[0.06] mb-1.5">
         <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#6b7280]">
-          {t('player.chapters', 'KAPITEL')}
+          {t('player.chapters', 'Chapters')}
         </span>
         {totalCount > 0 && (
           <span className="text-xs font-semibold text-gray-400 font-mono">
-            {currentNumber} av {totalCount}
+            {currentNumber} / {totalCount}
           </span>
         )}
       </div>
@@ -43,25 +51,29 @@ export function ChaptersPopover({
       <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar max-h-[300px] pr-1">
         {chapters.length === 0 ? (
           <div className="text-xs text-gray-500 text-center py-8">
-            {t('chapters.noChapters', 'Inga kapitel tillgängliga')}
+            {t('chapters.noChapters', 'No chapters available')}
           </div>
         ) : (
           chapters.map((ch, idx) => {
             const chNum = ch.number ?? idx + 1;
             const isCurrent = currentChapter?.number === chNum;
             const isPlayed = currentChapter ? chNum < currentNumber : false;
+            const startTime = typeof ch.start === 'number' && !isNaN(ch.start)
+              ? ch.start
+              : chapters.slice(0, idx).reduce((total, c) => total + (c.durationInSeconds || 0), 0);
 
             return (
               <button
                 key={idx}
+                ref={isCurrent ? currentChapterRef : undefined}
                 type="button"
                 onClick={() => {
-                  onSelectChapter(ch.start);
+                  onSelectChapter(startTime);
                   onClose();
                 }}
                 className={`w-full h-10 px-3 rounded-[9px] text-xs flex items-center justify-between transition-all ${
                   isCurrent
-                    ? 'bg-[#FF5100]/12 text-white font-semibold border border-[#FF5100]/30 shadow-sm'
+                    ? 'bg-[#FF5100]/15 text-white font-semibold border border-[#FF5100]/40 shadow-sm'
                     : isPlayed
                     ? 'text-[#6b7280] hover:bg-white/5 hover:text-gray-300'
                     : 'text-[#d1d5db] hover:bg-white/5 hover:text-white'
@@ -78,7 +90,7 @@ export function ChaptersPopover({
                     </span>
                   )}
                   <span className="truncate text-left">
-                    {ch.title || `Kapitel ${chNum}`}
+                    {ch.title || `${t('chapters.chapter', 'Kapitel')} ${chNum}`}
                   </span>
                 </div>
                 <span className="font-mono text-[11px] opacity-70 flex-shrink-0 tabular-nums">

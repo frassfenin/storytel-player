@@ -18,12 +18,17 @@
   },
   "dashboard": {
     "title": "Mitt bibliotek",
+    "bookCount_one": "{{count}} bok",
+    "bookCount_other": "{{count}} böcker",
     "logout": "Logga ut",
     "settings": "Inställningar",
     "search": "Sök i mitt bibliotek...",
     "searchCatalogPrompt": "Sök i hela Storytels katalog",
+    "exploreCatalog": "Utforska katalogen (⌘K)",
     "noBooks": "Inga böcker hittades",
     "emptyLibrary": "Ditt bibliotek verkar vara tomt.",
+    "noFilterMatch": "Inga böcker matchade ditt filter.",
+    "resetFilters": "Återställ filter",
     "loading": "Laddar ditt bibliotek...",
     "loadError": "Kunde inte ladda bokhyllan",
     "filters": {
@@ -33,10 +38,12 @@
     }
   },
   "player": {
-    "chapters": "Kapitel",
+    "chapters": "Ljudspår",
     "bookmarks": "Bokmärken",
     "addBookmark": "Lägg till bokmärke",
     "speed": "Hastighet",
+    "skipBackward": "-{{seconds}} sekunder",
+    "skipForward": "+{{seconds}} sekunder",
     "goTo": "Gå till",
     "goto": "Gå till",
     "playing": "Spelar",
@@ -85,6 +92,7 @@
     "error": "Fel",
     "cancel": "Avbryt",
     "save": "Spara",
+    "saving": "Sparar...",
     "delete": "Ta bort",
     "close": "Stäng"
   },
@@ -113,16 +121,21 @@
     "listen": "Lyssna",
     "language": "Språk",
     "duration": "Längd",
+    "narrator": "Uppläsare",
     "category": "Kategori",
+    "description": "Beskrivning",
     "noDescription": "Ingen beskrivning tillgänglig.",
     "showMore": "visa mer",
     "showLess": "visa mindre",
-    "details": "Bokdetaljer:"
+    "details": "Bokdetaljer:",
+    "loadError": "Kunde inte ladda bokinformationen"
   },
   "chapters": {
-    "title": "Kapitel",
-    "noChapters": "Inga kapitel tillgängliga",
-    "chapter": "Kapitel"
+    "title": "Ljudspår & Kapitel",
+    "noChapters": "Inga ljudspår tillgängliga",
+    "chapter": "Kapitel",
+    "track": "Ljudspår",
+    "tracks": "Ljudspår"
   },
   "gotoModal": {
     "title": "Gå till tid",
@@ -232,15 +245,24 @@
     "library": "Bokhylla",
     "search": "Sök i Storytels katalog",
     "player": "Spelare",
-    "settings": "Inställningar"
+    "settings": "Inställningar",
+    "dockLabel": "Flytande navigeringspanel"
   },
   "search": {
     "title": "Sök i Storytels utbud",
     "placeholder": "Sök efter titel, författare eller uppläsare...",
     "results": "Sökresultat",
+    "hitCount_one": "{{count}} träff",
+    "hitCount_other": "{{count}} träffar",
+    "hitCountFiltered": "{{count}} av {{total}} träffar",
+    "sortLabel": "Sortera:",
+    "sortRelevance": "Mest relevant",
+    "sortTitle": "Titel (A–Ö)",
+    "sortDuration": "Längst först",
     "noResults": "Inga böcker hittades för",
     "searching": "Söker...",
     "initialPrompt": "Sök bland hundratusentals ljudböcker och e-böcker på Storytel",
+    "selectBookHint": "Välj en bok för att förhandsgranska",
     "play": "Spela",
     "details": "Detaljer",
     "addToBookshelf": "Lägg till i bokhylla",
@@ -252,9 +274,12 @@
     "shortcut": "Tryck ⌘K / Ctrl+K när som helst",
     "allLanguages": "Alla",
     "filterByLanguage": "Språk",
+    "filterByLength": "Längd",
+    "allLengths": "Alla längder",
     "autoFilterHint": "Förvalt utifrån dina språk. Välj ”Alla” för att se alla träffar.",
     "noResultsHint": "Kontrollera stavningen eller sök på ett annat sökord",
     "noResultsInLanguages": "Inga träffar på {{languages}}.",
+    "noFilterMatch": "Inga träffar med valda filter",
     "showAllLanguages": "Visa alla språk ({{total}})",
     "errors": {
       "addToBookshelfFailed": "Kunde inte lägga till boken i bokhyllan. Den kanske inte ingår i ditt lands abonnemang.",

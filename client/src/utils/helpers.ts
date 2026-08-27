@@ -7,14 +7,26 @@ export const buildCoverUrl = (cover?: string | null): string => {
     return /^https?:\/\//.test(cover) ? cover : `https://www.storytel.com${cover}`;
 };
 
-export const localizedLanguageName = (code?: string | null, uiLocale = 'en'): string => {
-    if (!code) return '';
-    try {
-        const name = new Intl.DisplayNames([uiLocale], {type: 'language'}).of(code) || code;
-        return name.charAt(0).toUpperCase() + name.slice(1);
-    } catch {
-        return code.toUpperCase();
+export const localizedLanguageName = (
+    code?: string | null,
+    uiLocale = 'en',
+    fallbackName?: string | null
+): string => {
+    if (!code) {
+        return fallbackName ? fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1) : '';
     }
+    try {
+        const name = new Intl.DisplayNames([uiLocale], {type: 'language'}).of(code);
+        if (name && name.toLowerCase() !== code.toLowerCase()) {
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        }
+    } catch {
+        // ignore Intl lookup error
+    }
+    if (fallbackName) {
+        return fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
+    }
+    return code.toUpperCase();
 };
 
 export const formatTime = (seconds: number) => {

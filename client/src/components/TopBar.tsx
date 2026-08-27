@@ -90,7 +90,7 @@ export function TopBar({ onOpenSettings, searchQuery = '', onSearchChange }: Top
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
         </svg>
-        <span>{t('dashboard.title', 'Bokhylla')}</span>
+        <span>{t('dashboard.title', 'My Library')}</span>
       </button>
 
       {/* 3. Search Field */}
@@ -105,7 +105,7 @@ export function TopBar({ onOpenSettings, searchQuery = '', onSearchChange }: Top
             value={searchQuery}
             onChange={handleInputChange}
             onFocus={handleInputFocus}
-            placeholder={t('search.placeholder', 'Sök efter bok, författare eller uppläsare...')}
+            placeholder={t('search.placeholder', 'Search by title, author, or narrator...')}
             className="w-full bg-transparent text-white placeholder-gray-500 text-sm focus:outline-none"
           />
           {searchQuery ? (
@@ -131,7 +131,7 @@ export function TopBar({ onOpenSettings, searchQuery = '', onSearchChange }: Top
       {/* 5. Settings Button */}
       <button
         onClick={onOpenSettings}
-        title={t('settings.title', 'Inställningar')}
+        title={t('settings.title', 'Settings')}
         className="w-[38px] h-[38px] rounded-[10px] bg-[#1A1A1A] hover:bg-[#2C2C2E] border border-white/[0.08] text-gray-400 hover:text-white flex items-center justify-center transition-colors flex-shrink-0"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

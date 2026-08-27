@@ -67,14 +67,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   // current UI language, and only fall back to Storytel's own label when the
   // result carries no ISO code we can translate.
   const getLanguageLabel = (isoCode: string, apiName?: string): string => {
-    const localized = localizedLanguageName(isoCode, i18n.language || FALLBACK_LANGUAGE);
-    if (localized && localized.toLowerCase() !== isoCode.toLowerCase()) {
-      return localized;
-    }
-    if (apiName) {
-      return apiName.charAt(0).toUpperCase() + apiName.slice(1);
-    }
-    return isoCode.toUpperCase();
+    return localizedLanguageName(isoCode, i18n.language || FALLBACK_LANGUAGE, apiName);
   };
 
   const languageStats = useMemo(() => {
@@ -247,7 +240,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const handlePlayBook = (e: React.MouseEvent, bookId: string) => {
     e.stopPropagation();
     onClose();
-    navigate(`/player/${bookId}`);
+    navigate(`/player/${bookId}`, { state: { autoPlay: true } });
   };
 
   const handleViewDetails = (bookId: string) => {
@@ -266,7 +259,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       window.dispatchEvent(new Event('bookshelfUpdated'));
       setToastMessage({
         type: 'success',
-        text: t('search.addedToBookshelf', 'Tillagd i bokhyllan'),
+        text: t('search.addedToBookshelf', 'Added to Library'),
       });
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err: any) {
@@ -312,7 +305,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
             ref={inputRef}
             type="text"
             className="flex-1 bg-transparent text-white placeholder-gray-500 text-base focus:outline-none"
-            placeholder={t('search.placeholder', 'Sök efter titel, författare eller uppläsare...')}
+            placeholder={t('search.placeholder', 'Search by title, author, or narrator...')}
             value={query}
             onChange={handleInputChange}
           />
@@ -456,10 +449,10 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                 </svg>
               </div>
               <p className="text-base font-semibold text-white">
-                {t('search.initialPrompt', 'Sök i Storytels hela katalog')}
+                {t('search.initialPrompt', "Type to search Storytel's vast catalog of audiobooks")}
               </p>
               <p className="text-xs text-gray-400">
-                {t('search.shortcut', 'Tips: Tryck ⌘K när som helst')}
+                {t('search.shortcut', 'Press ⌘K / Ctrl+K anytime')}
               </p>
             </div>
           )}
@@ -468,7 +461,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           {searchedQuery && !isLoading && results.length === 0 && (
             <div className="text-center py-16 text-gray-400 space-y-2">
               <p className="text-base">
-                {t('search.noResults', 'Inga böcker hittades för')} &quot;<span className="text-white font-medium">{searchedQuery}</span>&quot;
+                {t('search.noResults', 'No books found for')} &quot;<span className="text-white font-medium">{searchedQuery}</span>&quot;
               </p>
               <p className="text-xs text-gray-500">{t('search.noResultsHint')}</p>
             </div>
@@ -528,12 +521,12 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {book.hasAbook && (
                       <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-[#FF5100]/20 text-[#FF5100] border border-[#FF5100]/30">
-                        {t('search.audiobook', 'Ljudbok')}
+                        {t('search.audiobook', 'Audiobook')}
                       </span>
                     )}
                     {book.hasEbook && (
                       <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                        {t('search.ebook', 'E-bok')}
+                        {t('search.ebook', 'E-book')}
                       </span>
                     )}
                     {book.language && (
@@ -562,13 +555,13 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
                   {book.authors && (
                     <p className="text-xs sm:text-sm text-gray-400 truncate mt-0.5">
-                      <span className="text-gray-500">{t('bookCard.author', 'Författare:')}</span> {book.authors}
+                      <span className="text-gray-500">{t('bookCard.author', 'Author:')}</span> {book.authors}
                     </p>
                   )}
 
                   {book.narrators && (
                     <p className="text-xs text-gray-400 truncate mt-0.5 hidden sm:block">
-                      <span className="text-gray-500">{t('bookCard.narrator', 'Uppläsare:')}</span> {book.narrators}
+                      <span className="text-gray-500">{t('bookCard.narrator', 'Narrator:')}</span> {book.narrators}
                     </p>
                   )}
                 </div>
@@ -578,7 +571,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                   {/* Add to Library Button */}
                   <button
                     onClick={(e) => handleAddToBookshelf(e, book.id)}
-                    title={isAdded ? t('search.addedToBookshelf', 'I bokhyllan') : t('search.addToBookshelf', 'Lägg till i bokhylla')}
+                    title={isAdded ? t('search.addedToBookshelf', 'Added to Library') : t('search.addToBookshelf', 'Add to Library')}
                     disabled={isAdded || isAdding}
                     className={`p-2.5 rounded-xl text-xs font-medium transition-all ${
                       isAdded
@@ -607,13 +600,13 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
                   {/* Play Button */}
                   <button
                     onClick={(e) => handlePlayBook(e, book.id)}
-                    title={t('search.play', 'Spela')}
+                    title={t('search.play', 'Play')}
                     className="px-3.5 py-2 rounded-xl bg-[#FF5100] hover:bg-[#ff641a] text-white font-medium text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-[#FF5100]/25 transition-all hover:scale-105 active:scale-95"
                   >
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    <span className="hidden sm:inline">{t('search.play', 'Spela')}</span>
+                    <span className="hidden sm:inline">{t('search.play', 'Play')}</span>
                   </button>
                 </div>
               </div>

@@ -55,6 +55,18 @@ const FIREBASE_TOKEN_URL = "https://securetoken.googleapis.com";
 const FIREBASE_REFERER = "https://www.storytel.com/";
 const FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS = 60;
 
+// Base URL of the public web search endpoint, per market country. Storytel's own
+// site is scoped by `/{country}/{lang}/`, where only the country segment decides
+// which catalog answers - except Denmark, which Storytel runs under the Mofibo
+// brand on its own host, and which does need the matching language segment.
+const WEB_SEARCH_BASE_URLS: Record<string, string> = {
+  dk: "https://mofibo.com/dk/da",
+};
+
+const webSearchBaseUrl = (country: string): string =>
+  WEB_SEARCH_BASE_URLS[country] ??
+  `https://www.storytel.com/${country}/${country}`;
+
 // --- Bookshelf ---------------------------------------------------------------
 
 // Raw shape returned by POST https://api.storytel.net/libraries/bookshelf
@@ -335,6 +347,58 @@ class StorytelClient {
     return this.loginData.accountInfo.jwt;
   }
 
+  // Market country ISO code (e.g. "it", "se", "fi") carried by a Storytel JWT:
+  // `store` is shaped like "STHP-IT", with `country`/`countryCode` as fallbacks.
+  private countryFromJwt(token?: string | null): string | undefined {
+    if (!token) return undefined;
+    try {
+      const parts = token.split(".");
+      if (parts.length < 2) return undefined;
+      const payloadJson = Buffer.from(parts[1], "base64url").toString("utf-8");
+      const payload = JSON.parse(payloadJson);
+      if (typeof payload.store === "string") {
+        const storeParts = payload.store.split("-");
+        const code = storeParts[storeParts.length - 1]?.trim().toLowerCase();
+        if (code && /^[a-z]{2}$/.test(code)) {
+          return code;
+        }
+      }
+      for (const claim of [payload.country, payload.countryCode]) {
+        if (typeof claim === "string" && /^[a-z]{2}$/i.test(claim.trim())) {
+          return claim.trim().toLowerCase();
+        }
+      }
+    } catch {
+      // ignore parsing failures
+    }
+    return undefined;
+  }
+
+  // Derive the account's market country from whichever token carries the claim.
+  // Legacy logins put it on the login.action JWT; SSO logins send a Firebase ID
+  // token as the bearer, which need not carry it at all, so the Firebase session
+  // cookie is tried as well. Returns undefined when no token names a market.
+  private async getMarketCountryCode(): Promise<string | undefined> {
+    const candidates: (string | null | undefined)[] = [];
+    try {
+      candidates.push(await this.getApiBearer());
+    } catch (error: any) {
+      // A failing token refresh must not break search
+      console.warn(
+        "[storytelApi] could not read api bearer for market lookup:",
+        error.message,
+      );
+    }
+    candidates.push(this.loginData.accountInfo.jwt);
+    candidates.push(this.ssoSession?.storytelSession);
+
+    for (const token of candidates) {
+      const code = this.countryFromJwt(token);
+      if (code) return code;
+    }
+    return undefined;
+  }
+
   async getBookmarkPositional(
     consumableId: string | null = null,
   ): Promise<Bookmark[]> {
@@ -613,11 +677,16 @@ class StorytelClient {
             const id = String(model.id || model.consumableId || raw.id || raw.consumableId || "");
             const title = model.title || model.name || raw.title || raw.name || "";
             if (!id || !title || seenIds.has(id)) continue;
-            seenIds.add(id);
 
             const formats: any[] = Array.isArray(model.formats) ? model.formats : [];
             const abook = formats.find((f: any) => f.type === "abook");
             const ebook = formats.find((f: any) => f.type === "ebook");
+
+            // Exclude ebook-only items since this application is an audiobook player
+            if (!abook) continue;
+
+            seenIds.add(id);
+
             const coverUrl = abook?.cover?.url || ebook?.cover?.url || model.cover?.url || "";
             const { language, languageName } = this.extractLanguageInfo(model, raw);
 
@@ -646,13 +715,28 @@ class StorytelClient {
       console.warn("[storytelApi] api.storytel.net search failed, trying fallback:", err);
     }
 
-    // 2. Fallback to storytel.com web search API if authenticated search returned 0 results
+    // 2. Fallback to storytel.com web search API if authenticated search returned 0 results.
+    // The endpoint is scoped by URL path (`/{country}/{lang}/api/search.action`, where only
+    // the country segment decides the catalog) and answers for the Swedish market when the
+    // prefix is missing. Without a known market it is skipped entirely: hits from a foreign
+    // catalog cannot be added to this account's bookshelf anyway.
+    const country = await this.getMarketCountryCode();
+    if (!country) {
+      console.warn(
+        "[storytelApi] market country unknown, skipping storytel.com fallback search",
+      );
+      return results;
+    }
+
     try {
-      const searchActionUrl = `https://www.storytel.com/api/search.action?q=${encodeURIComponent(trimmed)}`;
+      const searchActionUrl = `${webSearchBaseUrl(country)}/api/search.action?q=${encodeURIComponent(trimmed)}`;
       const response = await this.client.get(searchActionUrl, {
         headers: {
           Accept: "application/json, text/plain, */*",
         },
+        // Redirects stay disabled (see the client config): markets whose public
+        // search is gated behind sign-in (us, gb) answer 3xx towards an OAuth page,
+        // and following that would only download HTML that is discarded below.
       });
 
       const data = response.data;
@@ -661,6 +745,10 @@ class StorytelClient {
           const book = item?.book || {};
           const abook = item?.abook || {};
           const ebook = item?.ebook || {};
+
+          const hasAbook = !!abook.id || !!item.abook;
+          // Exclude ebook-only items since this application is an audiobook player
+          if (!hasAbook) continue;
 
           const id = String(book.consumableId || book.id || abook.id || item.id || "");
           const title = book.name || book.title || "";
@@ -701,7 +789,7 @@ class StorytelClient {
             category: book.category?.title || book.category?.name || "",
             durationMs,
             description: abook.description || ebook.description || "",
-            hasAbook: !!abook.id || !!item.abook,
+            hasAbook: true,
             hasEbook: !!ebook.id || !!item.ebook,
             language,
             languageName,
@@ -987,20 +1075,102 @@ class StorytelClient {
   }
 
   async getPlayBookMetaData(consumableId: string): Promise<any> {
-    const url = `https://api.storytel.net/playback-metadata/consumable/${consumableId}`;
+    const hasChapters = (data: any) => {
+      if (!data || typeof data !== "object") return false;
+      if (Array.isArray(data.chapters) && data.chapters.length > 0) return true;
+      if (Array.isArray(data.tracks) && data.tracks.length > 0) return true;
+      if (Array.isArray(data.items) && data.items.length > 0) return true;
+      if (data.abook?.chapters && Array.isArray(data.abook.chapters) && data.abook.chapters.length > 0) return true;
+      const abook = Array.isArray(data.formats)
+        ? data.formats.find((f: any) => f.type === "abook")
+        : null;
+      if (abook?.chapters && Array.isArray(abook.chapters) && abook.chapters.length > 0) return true;
+      if (abook?.tracks && Array.isArray(abook.tracks) && abook.tracks.length > 0) return true;
+      return false;
+    };
+
+    const candidates = [
+      `https://api.storytel.net/playback-metadata/consumables/${consumableId}`,
+      `https://api.storytel.net/playback-metadata/consumable/${consumableId}`,
+      `https://api.storytel.net/playback-metadata/v2/consumables/${consumableId}`,
+      `https://api.storytel.net/assets/v2/consumables/${consumableId}/abook`,
+      `https://api.storytel.net/consumables/${consumableId}/tracks`,
+      `https://api.storytel.net/consumables/${consumableId}/chapters`,
+    ];
+
+    let fallbackData: any = null;
+    let lastError: any = null;
 
     try {
       const bearer = await this.getApiBearer();
-      const response = await this.client.get(url, {
-        headers: {
-          Authorization: `Bearer ${bearer}`,
-        },
-      });
-      return response.data;
-    } catch (error: any) {
-      if (error.isStorytelUnauthorized) throw error;
-      throw new Error(`Failed to get bookinfo: ${error.message}`);
+      for (const url of candidates) {
+        try {
+          const response = await this.client.get(url, {
+            headers: {
+              Authorization: `Bearer ${bearer}`,
+              Accept: "application/json, text/plain, */*",
+            },
+          });
+          if (response.data) {
+            if (hasChapters(response.data)) {
+              return response.data;
+            }
+            if (!fallbackData) {
+              fallbackData = response.data;
+            }
+          }
+        } catch (error: any) {
+          if (error.isStorytelUnauthorized) throw error;
+          lastError = error;
+        }
+      }
+    } catch (err: any) {
+      if (err.isStorytelUnauthorized) throw err;
+      lastError = err;
     }
+
+    try {
+      const legacyToken = this.getLegacyActionToken();
+      if (legacyToken) {
+        const legacyUrls = [
+          `https://www.storytel.com/api/getBookInfo.action?token=${encodeURIComponent(legacyToken)}&programId=${encodeURIComponent(consumableId)}`,
+          `https://www.storytel.com/api/getABookTracks.action?token=${encodeURIComponent(legacyToken)}&programId=${encodeURIComponent(consumableId)}`,
+          `https://www.storytel.com/api/getChapters.action?token=${encodeURIComponent(legacyToken)}&programId=${encodeURIComponent(consumableId)}`,
+        ];
+        for (const legacyUrl of legacyUrls) {
+          try {
+            const response = await this.client.get(legacyUrl);
+            if (response.data) {
+              if (hasChapters(response.data)) {
+                return response.data;
+              }
+              if (!fallbackData) {
+                fallbackData = response.data;
+              }
+            }
+          } catch {
+            // Try next legacy url
+          }
+        }
+      }
+    } catch {
+      // Ignore legacy fallback failure
+    }
+
+    // Try book-details as last resort
+    if (!fallbackData) {
+      try {
+        const details = await this.getBookDetails(consumableId);
+        if (details) return details;
+      } catch (err: any) {
+        if (err.isStorytelUnauthorized) throw err;
+        lastError = err;
+      }
+    } else {
+      return fallbackData;
+    }
+
+    throw new Error(`Failed to get bookinfo: ${lastError?.message || "Unknown error"}`);
   }
 
   // New api.storytel.net audio endpoint. Returns a 302 redirect to a signed

@@ -33,7 +33,7 @@ export function FloatingMenu({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
-  const bookTitle = audio.activeBook?.book?.name || t('player.nowPlaying', 'Ljudbok');
+  const bookTitle = audio.activeBook?.book?.name || t('player.nowPlaying', 'Now Playing:');
   const bookAuthor = audio.activeBook?.book?.authorsAsString || '';
   const coverUrl =
     audio.activeBook?.book?.largeCover ||
@@ -51,12 +51,12 @@ export function FloatingMenu({
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 select-none max-w-[95vw]">
       <nav
         className="flex items-center gap-2 sm:gap-3 px-3.5 py-2 rounded-full bg-[#141414]/90 backdrop-blur-2xl border border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.8)] ring-1 ring-white/5 transition-all duration-300"
-        aria-label="Floating Navigation Dock"
+        aria-label={t('floatingMenu.dockLabel', 'Floating navigation dock')}
       >
         {/* 1. Library / Bookshelf Button */}
         <button
           onClick={() => navigate('/')}
-          title={t('floatingMenu.library', 'Bokhylla')}
+          title={t('floatingMenu.library', 'Library')}
           className={`flex items-center justify-center p-2.5 rounded-2xl transition-all duration-200 ${
             isHome
               ? 'bg-[#FF5100] text-white shadow-lg shadow-[#FF5100]/30 scale-105'
@@ -71,7 +71,7 @@ export function FloatingMenu({
         {/* 2. Global Catalog Search Button */}
         <button
           onClick={onOpenSearch}
-          title={t('floatingMenu.search', 'Sök i Storytels katalog')}
+          title={t('floatingMenu.search', 'Search Storytel catalog')}
           className="flex items-center justify-center p-2.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +90,7 @@ export function FloatingMenu({
             {/* Unified Circular Cover/Play Button */}
             <button
               onClick={audio.togglePlayPause}
-              title={audio.isPlaying ? t('player.paused', 'Pausa') : t('player.playing', 'Spela')}
+              title={audio.isPlaying ? t('player.paused', 'Paused') : t('player.playing', 'Playing')}
               className="relative w-11 h-11 flex-shrink-0 group/cover rounded-full focus:outline-none transition-transform hover:scale-105 active:scale-95 shadow-md"
             >
               {/* Progress Ring SVG */}
@@ -180,7 +180,7 @@ export function FloatingMenu({
         {/* 5. Settings Gear Icon Button */}
         <button
           onClick={onOpenSettings}
-          title={t('floatingMenu.settings', 'Inställningar')}
+          title={t('floatingMenu.settings', 'Settings')}
           className="flex items-center justify-center p-2.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
         >
           <svg className="w-5 h-5 transition-transform hover:rotate-45 duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

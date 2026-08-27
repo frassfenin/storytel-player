@@ -7,7 +7,6 @@ export interface LanguageStat {
   count: number;
 }
 
-export type FormatFilter = 'all' | 'abook' | 'ebook';
 export type DurationFilter = 'all' | 'under5' | '5to15' | 'over15';
 
 interface SearchFilterRailProps {
@@ -15,8 +14,6 @@ interface SearchFilterRailProps {
   selectedLanguages: string[]; // empty array means all
   onToggleLanguage: (iso: string) => void;
   onSelectAllLanguages: () => void;
-  selectedFormat: FormatFilter;
-  onChangeFormat: (format: FormatFilter) => void;
   selectedDuration: DurationFilter;
   onChangeDuration: (duration: DurationFilter) => void;
   totalHits: number;
@@ -27,8 +24,6 @@ export function SearchFilterRail({
   selectedLanguages,
   onToggleLanguage,
   onSelectAllLanguages,
-  selectedFormat,
-  onChangeFormat,
   selectedDuration,
   onChangeDuration,
   totalHits,
@@ -43,7 +38,7 @@ export function SearchFilterRail({
       <div>
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#6b7280]">
-            {t('search.filterByLanguage', 'Språk')}
+            {t('search.filterByLanguage', 'Language')}
           </span>
           {!isAllLanguagesSelected && (
             <button
@@ -51,7 +46,7 @@ export function SearchFilterRail({
               onClick={onSelectAllLanguages}
               className="text-[11px] font-semibold text-[#FF5100] hover:text-[#ff6b2b] transition-colors"
             >
-              {t('search.showAllLanguages', 'Visa alla')}
+              {t('search.showAllLanguages', { total: totalHits })}
             </button>
           )}
         </div>
@@ -81,7 +76,7 @@ export function SearchFilterRail({
                   </svg>
                 )}
               </div>
-              <span className="truncate">{t('search.allLanguages', 'Alla språk')}</span>
+              <span className="truncate">{t('search.allLanguages', 'All')}</span>
             </div>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#222225] text-gray-400">
               {totalHits}
@@ -127,61 +122,16 @@ export function SearchFilterRail({
         </div>
       </div>
 
-      {/* 2. Format Section */}
+      {/* 2. Length Section */}
       <div>
         <div className="mb-2.5">
           <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#6b7280]">
-            Format
+            {t('search.filterByLength', 'Length')}
           </span>
         </div>
         <div className="space-y-1">
           {[
-            { id: 'all' as FormatFilter, label: 'Alla format' },
-            { id: 'abook' as FormatFilter, label: t('search.audiobook', 'Ljudbok') },
-            { id: 'ebook' as FormatFilter, label: t('search.ebook', 'E-bok') },
-          ].map((fmt) => {
-            const isSelected = selectedFormat === fmt.id;
-            return (
-              <button
-                key={fmt.id}
-                type="button"
-                onClick={() => onChangeFormat(fmt.id)}
-                className={`w-full h-9 px-2.5 rounded-[10px] flex items-center gap-2.5 text-xs font-medium transition-all ${
-                  isSelected
-                    ? 'bg-[#FF5100]/10 border border-[#FF5100]/40 text-white'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white border border-transparent'
-                }`}
-              >
-                <div
-                  className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isSelected
-                      ? 'bg-[#FF5100] text-white'
-                      : 'border-[1.5px] border-white/20'
-                  }`}
-                >
-                  {isSelected && (
-                    <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-                <span className="truncate">{fmt.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. Length Section */}
-      <div>
-        <div className="mb-2.5">
-          <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-[#6b7280]">
-            Längd
-          </span>
-        </div>
-        <div className="space-y-1">
-          {[
-            { id: 'all' as DurationFilter, label: 'Alla längder' },
+            { id: 'all' as DurationFilter, label: t('search.allLengths', 'All lengths') },
             { id: 'under5' as DurationFilter, label: '< 5 h' },
             { id: '5to15' as DurationFilter, label: '5–15 h' },
             { id: 'over15' as DurationFilter, label: '> 15 h' },

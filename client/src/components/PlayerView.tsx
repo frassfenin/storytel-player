@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import LoadingState from './LoadingState';
@@ -29,6 +29,9 @@ function PlayerView() {
 
     const [fetchedBook, setFetchedBook] = useState<BookShelfEntity | null>(null);
     const book: BookShelfEntity | null = location.state?.book || fetchedBook || audio.activeBook;
+    // The play buttons navigate here with `autoPlay` in the router state; opening
+    // the player any other way (mini player, deep link) only loads the book.
+    const autoPlayRequested = location.state?.autoPlay === true;
     const activeConsumableId = book?.book?.consumableId || bookId || '';
 
     const [error, setError] = useState('');
@@ -78,12 +81,21 @@ function PlayerView() {
         }
     }, [bookId, location.state, audio.activeBook]);
 
-    // Load book into central audio player
+    // Load book into central audio player. The play intent belongs to the
+    // navigation, so it is honoured on the first run - which also resumes a book
+    // that is loaded but paused - and afterwards only while the stream is still
+    // missing. A re-run (the book details arriving, say, or React invoking the
+    // effect twice in development) can therefore neither swallow the intent nor
+    // resume playback the user has just paused.
+    const isFirstLoadRef = useRef(true);
     useEffect(() => {
         if (bookId) {
-            audio.loadBook(book, bookId, false);
+            const isAlreadyLoaded = audio.activeBookId === bookId && !!audio.audioSrc;
+            const autoPlay = autoPlayRequested && (isFirstLoadRef.current || !isAlreadyLoaded);
+            isFirstLoadRef.current = false;
+            audio.loadBook(book, bookId, autoPlay);
         }
-    }, [bookId, book, audio.loadBook]);
+    }, [bookId, book, autoPlayRequested, audio.loadBook]);
 
     // Bookmarks hook
     const bookmarks = useBookmarks({
@@ -310,8 +322,8 @@ function PlayerView() {
                         {/* Book Info */}
                         <BookInfo
                             book={book}
-                            currentChapter={chapters.currentChapter}
-                            chapters={chapters.chapters}
+                            currentChapter={chapters.currentChapter || audio.currentChapter}
+                            chapters={chapters.chapters.length > 0 ? chapters.chapters : audio.chapters}
                             currentTime={audio.currentTime}
                             playbackRate={audio.playbackRate}
                             onShowChaptersModal={() => chapters.setShowChaptersModal(true)}
@@ -363,11 +375,14 @@ function PlayerView() {
 
                         <ChaptersModal
                             isOpen={chapters.showChaptersModal}
-                            chapters={chapters.chapters}
+                            chapters={chapters.chapters.length > 0 ? chapters.chapters : audio.chapters}
                             currentTime={audio.currentTime}
                             playbackRate={audio.playbackRate}
                             onClose={() => chapters.setShowChaptersModal(false)}
-                            onChapterClick={(time) => chapters.handleChapterClick(time, audio.audioRef)}
+                            onChapterClick={(time) => {
+                                audio.seek(time);
+                                chapters.setShowChaptersModal(false);
+                            }}
                         />
 
                         <BookmarkModals

@@ -28,7 +28,7 @@ export function SearchPreviewPane({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
         </div>
-        <p className="text-sm font-medium text-gray-400">Välj en bok för att förhandsgranska</p>
+        <p className="text-sm font-medium text-gray-400">{t('search.selectBookHint', 'Select a book to preview')}</p>
       </aside>
     );
   }
@@ -36,8 +36,8 @@ export function SearchPreviewPane({
   const durationText =
     book.durationMs > 0 ? formatMicrosecondsTime(book.durationMs * 1000) : '—';
   const languageLabel = book.language
-    ? localizedLanguageName(book.language, i18n.language) || book.language.toUpperCase()
-    : '—';
+    ? localizedLanguageName(book.language, i18n.language, book.languageName)
+    : (book.languageName ? (book.languageName.charAt(0).toUpperCase() + book.languageName.slice(1)) : '—');
 
   return (
     <aside className="w-[340px] p-[22px] bg-[#0D0D0F] border-l border-white/[0.05] flex flex-col flex-shrink-0 select-none overflow-y-auto custom-scrollbar">
@@ -78,7 +78,7 @@ export function SearchPreviewPane({
           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <span>{t('bookView.listen', 'Lyssna')}</span>
+          <span>{t('bookView.listen', 'Listen')}</span>
         </button>
 
         <button
@@ -98,16 +98,16 @@ export function SearchPreviewPane({
               <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <span>{t('bookView.inLibrary', 'I bokhyllan')}</span>
+              <span>{t('bookView.inLibrary', 'In Library')}</span>
             </>
           ) : isAdding ? (
-            <span>Sparar...</span>
+            <span>{t('common.saving', 'Saving...')}</span>
           ) : (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span>{t('bookView.addToLibrary', 'Spara')}</span>
+              <span>{t('bookView.addToLibrary', 'Add to Library')}</span>
             </>
           )}
         </button>
@@ -116,16 +116,16 @@ export function SearchPreviewPane({
       {/* Metadata Rows */}
       <div className="border-t border-b border-white/[0.06] divide-y divide-white/[0.04] py-1 text-[13px] mb-5">
         <div className="py-2.5 flex items-center justify-between">
-          <span className="text-gray-500">{t('bookView.language', 'Språk')}</span>
+          <span className="text-gray-500">{t('bookView.language', 'Language')}</span>
           <span className="text-gray-200 font-medium">{languageLabel}</span>
         </div>
         <div className="py-2.5 flex items-center justify-between">
-          <span className="text-gray-500">{t('bookView.duration', 'Längd')}</span>
+          <span className="text-gray-500">{t('bookView.duration', 'Duration')}</span>
           <span className="text-gray-200 font-medium">{durationText}</span>
         </div>
         {book.narrators && (
           <div className="py-2.5 flex items-center justify-between">
-            <span className="text-gray-500">Uppläsare</span>
+            <span className="text-gray-500">{t('bookView.narrator', 'Narrator')}</span>
             <span className="text-gray-200 font-medium truncate max-w-[170px] text-right" title={book.narrators}>
               {book.narrators}
             </span>
@@ -133,7 +133,7 @@ export function SearchPreviewPane({
         )}
         {book.category && (
           <div className="py-2.5 flex items-center justify-between">
-            <span className="text-gray-500">{t('bookView.category', 'Kategori')}</span>
+            <span className="text-gray-500">{t('bookView.category', 'Category')}</span>
             <span className="text-gray-200 font-medium truncate max-w-[170px] text-right" title={book.category}>
               {book.category}
             </span>
@@ -145,7 +145,7 @@ export function SearchPreviewPane({
       {book.description && (
         <div>
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Beskrivning
+            {t('bookView.description', 'Description')}
           </h4>
           <p className="text-[13px] leading-relaxed text-[#d1d5db] font-normal text-pretty">
             {book.description}

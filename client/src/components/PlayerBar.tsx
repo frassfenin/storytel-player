@@ -82,12 +82,12 @@ export function PlayerBar() {
 
   const speeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   const sleepOptions: { label: string; value: number | 'chapter' | null }[] = [
-    { label: t('player.off', 'Av'), value: null },
+    { label: t('player.off', 'Off'), value: null },
     { label: '15 min', value: 15 },
     { label: '30 min', value: 30 },
     { label: '45 min', value: 45 },
     { label: '60 min', value: 60 },
-    { label: t('player.endOfChapter', 'Slutet av kapitlet'), value: 'chapter' },
+    { label: t('player.endOfChapter', 'End of chapter'), value: 'chapter' },
   ];
 
   return (
@@ -148,7 +148,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => skipBackward(15)}
-            title="-15 sekunder"
+            title={t('player.skipBackward', { seconds: 15 })}
             className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center relative"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,7 +184,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => skipForward(30)}
-            title="+30 sekunder"
+            title={t('player.skipForward', { seconds: 30 })}
             className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center relative"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,7 +233,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => setShowSpeedPopover((prev) => !prev)}
-            title={t('player.speed', 'Hastighet')}
+            title={t('player.speed', 'Speed')}
             className={`h-9 px-2.5 rounded-[10px] text-xs font-bold transition-all flex items-center justify-center ${
               playbackRate !== 1.0
                 ? 'bg-[#FF5100]/20 text-[#FF5100] border border-[#FF5100]/40'
@@ -246,7 +246,7 @@ export function PlayerBar() {
           {showSpeedPopover && (
             <div className="absolute bottom-[88px] right-0 w-36 bg-[#17171A] border border-white/[0.12] rounded-[14px] shadow-[0_24px_60px_rgba(0,0,0,0.85)] p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 select-none">
               <div className="text-[11px] font-bold text-[#6b7280] px-2 py-1 uppercase tracking-wider">
-                {t('player.speed', 'HASTIGHET')}
+                {t('player.speed', 'Speed')}
               </div>
               {speeds.map((rate) => (
                 <button
@@ -279,7 +279,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => setShowChapterPopover((prev) => !prev)}
-            title={t('player.chapters', 'Kapitel')}
+            title={t('player.chapters', 'Chapters')}
             className={`h-9 px-2.5 rounded-[10px] transition-colors flex items-center gap-1.5 text-xs font-medium ${
               showChapterPopover
                 ? 'bg-white/[0.15] text-white border border-white/20'
@@ -289,7 +289,7 @@ export function PlayerBar() {
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
             </svg>
-            <span className="hidden sm:inline">{t('player.chapters', 'Kapitel')}</span>
+            <span className="hidden sm:inline">{t('player.chapters', 'Chapters')}</span>
           </button>
 
           {showChapterPopover && (
@@ -307,7 +307,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => setShowSleepPopover((prev) => !prev)}
-            title={t('player.sleepTimer', 'Sovtimer')}
+            title={t('player.sleepTimer', 'Sleep Timer')}
             className={`w-9 h-9 rounded-[10px] transition-colors flex items-center justify-center relative ${
               sleepTimerMode !== null
                 ? 'bg-[#FF5100]/20 text-[#FF5100] border border-[#FF5100]/40'
@@ -327,7 +327,7 @@ export function PlayerBar() {
           {showSleepPopover && (
             <div className="absolute bottom-[88px] right-0 w-48 bg-[#17171A] border border-white/[0.12] rounded-[14px] shadow-[0_24px_60px_rgba(0,0,0,0.85)] p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 select-none">
               <div className="text-[11px] font-bold text-[#6b7280] px-2.5 py-1 uppercase tracking-wider">
-                {t('player.sleepTimer', 'SOVTIMER')}
+                {t('player.sleepTimer', 'Sleep Timer')}
               </div>
               {sleepOptions.map((opt, idx) => {
                 const isSelected = sleepTimerMode === opt.value;
@@ -363,7 +363,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={toggleMute}
-            title={t('player.volume', 'Volym')}
+            title={t('player.volume', 'Volume')}
             className="text-gray-400 hover:text-white p-1 rounded transition-colors"
           >
             {isMuted || volume === 0 ? (
@@ -399,7 +399,7 @@ export function PlayerBar() {
         <button
           type="button"
           onClick={handleOpenFullPlayer}
-          title={t('player.expand', 'Öppna full spelare')}
+          title={t('player.expand', 'Open full player')}
           className="w-9 h-9 rounded-[10px] bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.10] text-gray-300 hover:text-white flex items-center justify-center transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

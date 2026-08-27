@@ -38,20 +38,20 @@ export function SearchResultList({
       <div className="h-[46px] px-6 border-b border-white/[0.05] flex items-center justify-between flex-shrink-0 select-none">
         <span className="text-xs font-semibold text-gray-400">
           {results.length === totalRawHits
-            ? `${results.length} träffar`
-            : `${results.length} av ${totalRawHits} träffar`}
+            ? t('search.hitCount', { count: results.length })
+            : t('search.hitCountFiltered', { count: results.length, total: totalRawHits })}
         </span>
 
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-500 font-medium">Sortera:</span>
+          <span className="text-[11px] text-gray-500 font-medium">{t('search.sortLabel', 'Sort:')}</span>
           <select
             value={sortBy}
             onChange={(e) => onChangeSort(e.target.value as SortOption)}
             className="h-7 px-2.5 rounded-[8px] bg-[#1A1A1A] border border-white/10 text-xs text-gray-200 outline-none focus:border-[#FF5100]"
           >
-            <option value="relevance">Mest relevant</option>
-            <option value="title">Titel (A–Ö)</option>
-            <option value="duration">Längst först</option>
+            <option value="relevance">{t('search.sortRelevance', 'Most relevant')}</option>
+            <option value="title">{t('search.sortTitle', 'Title (A–Z)')}</option>
+            <option value="duration">{t('search.sortDuration', 'Longest first')}</option>
           </select>
         </div>
       </div>
@@ -98,12 +98,12 @@ export function SearchResultList({
                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                   {book.hasAbook && (
                     <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-[#FF5100]/20 text-[#FF5100] border border-[#FF5100]/30">
-                      {t('search.audiobook', 'Ljudbok')}
+                      {t('search.audiobook', 'Audiobook')}
                     </span>
                   )}
                   {book.hasEbook && (
                     <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[#60a5fa] border border-blue-500/30">
-                      {t('search.ebook', 'E-bok')}
+                      {t('search.ebook', 'E-book')}
                     </span>
                   )}
                   {book.language && (
@@ -139,7 +139,7 @@ export function SearchResultList({
                 <button
                   type="button"
                   onClick={(e) => onAddToLibrary(e, book.id)}
-                  title={isAdded ? t('search.addedToBookshelf', 'I bokhyllan') : t('search.addToBookshelf', 'Lägg till i bokhylla')}
+                  title={isAdded ? t('search.addedToBookshelf', 'Added to Library') : t('search.addToBookshelf', 'Add to Library')}
                   disabled={isAdded || isAdding}
                   className={`w-9 h-9 rounded-[10px] flex items-center justify-center transition-all ${
                     isAdded
@@ -169,7 +169,7 @@ export function SearchResultList({
                 <button
                   type="button"
                   onClick={(e) => onPlayBook(e, book.id)}
-                  title={t('search.play', 'Lyssna')}
+                  title={t('search.play', 'Play')}
                   className={`h-9 px-3.5 rounded-full font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
                     isSelected
                       ? 'bg-[#FF5100] hover:bg-[#ff641a] text-white shadow-[#FF5100]/30'
@@ -179,7 +179,7 @@ export function SearchResultList({
                   <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z" />
                   </svg>
-                  <span>{t('search.play', 'Lyssna')}</span>
+                  <span>{t('search.play', 'Play')}</span>
                 </button>
               </div>
             </div>

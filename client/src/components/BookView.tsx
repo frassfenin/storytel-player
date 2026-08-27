@@ -122,7 +122,7 @@ function BookView() {
             window.dispatchEvent(new Event('bookshelfUpdated'));
             setSaveToast({
                 type: 'success',
-                text: t('bookView.savedToLibrary', 'Boken har lagts till i din bokhylla!'),
+                text: t('bookView.savedToLibrary', 'Book added to your library!'),
             });
             setTimeout(() => setSaveToast(null), 3000);
         } catch (err: any) {
@@ -160,7 +160,7 @@ function BookView() {
     };
 
     const handlePlayBook = () => {
-        navigate(`/player/${bookId}`, {state: {book}});
+        navigate(`/player/${bookId}`, {state: {book, autoPlay: true}});
     };
 
     if (isLoading) {
@@ -251,7 +251,7 @@ function BookView() {
                             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7z"/>
                             </svg>
-                            <span>{t('bookView.listen', 'Lyssna')}</span>
+                            <span>{t('bookView.listen', 'Listen')}</span>
                         </button>
 
                         {/* Save to Bookshelf Button */}

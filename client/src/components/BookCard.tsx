@@ -43,8 +43,8 @@ export function BookCard({ book, onBookSelect, onRemove, onQuickPlay }: BookCard
             e.stopPropagation();
             onRemove(book);
           }}
-          title={t('bookshelf.remove', 'Ta bort från bokhylla')}
-          aria-label={t('bookshelf.remove', 'Ta bort från bokhylla')}
+          title={t('bookshelf.remove', 'Remove from library')}
+          aria-label={t('bookshelf.remove', 'Remove from library')}
           className="absolute top-2.5 right-2.5 z-20 w-8 h-8 rounded-lg bg-black/60 backdrop-blur-md text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-white hover:bg-red-600/90 focus:outline-none transition-all flex items-center justify-center shadow-lg"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +92,7 @@ export function BookCard({ book, onBookSelect, onRemove, onQuickPlay }: BookCard
         {/* Format Badge (Audio / Ebook) */}
         {book.abook && (
           <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-sm text-[10px] font-bold text-white/90 uppercase tracking-wider">
-            {t('search.audiobook', 'Ljudbok')}
+            {t('search.audiobook', 'Audiobook')}
           </span>
         )}
       </div>
@@ -116,12 +116,12 @@ export function BookCard({ book, onBookSelect, onRemove, onQuickPlay }: BookCard
           <div className="flex items-center justify-between text-[11px] text-gray-400 mb-1.5">
             <span className="truncate">
               {isFinished
-                ? t('dashboard.filters.concluded', 'Avslutad')
+                ? t('dashboard.filters.concluded', 'Concluded')
                 : isStarted
-                ? `${formatMicrosecondsTime(remainingTime)} ${t('bookCard.remaining', 'kvar')}`
+                ? `${formatMicrosecondsTime(remainingTime)} ${t('bookCard.remaining', 'remaining')}`
                 : totalDuration > 0
                 ? formatMicrosecondsTime(totalDuration)
-                : t('dashboard.filters.notStarted', 'Ej påbörjad')}
+                : t('dashboard.filters.notStarted', 'Not started')}
             </span>
             {isStarted && (
               <span className="font-mono font-semibold text-gray-500 tabular-nums">
