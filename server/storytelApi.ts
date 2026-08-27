@@ -145,6 +145,18 @@ class StorytelClient {
   private cachedFirebaseIdToken: { token: string; expiresAt: number } | null =
     null;
 
+  private static firebaseTokenCache = new Map<
+    string,
+    { token: string; expiresAt: number }
+  >();
+  private static legacyLoginCache = new Map<
+    string,
+    { jwt: string; singleSignToken: string; expiresAt: number }
+  >();
+
+  private savedEmail?: string;
+  private savedEncryptedPassword?: string;
+
   constructor() {
     this.client = axios.create({
       headers: {
@@ -195,7 +207,7 @@ class StorytelClient {
         });
         return response;
       },
-      (error) => {
+      async (error) => {
         const url = error.config?.url || "";
         const isLoginRequest = url.includes("login.action");
         let cleanUrl = url;
@@ -210,6 +222,38 @@ class StorytelClient {
           url: cleanUrl,
           data: error.response?.data || error.message,
         });
+
+        // If 401 occurs on an authenticated request and we have not retried yet:
+        // Automatically refresh tokens and retry the request transparently.
+        if (
+          error.response?.status === 401 &&
+          !isLoginRequest &&
+          error.config &&
+          !error.config._isRetry
+        ) {
+          error.config._isRetry = true;
+          try {
+            if (this.ssoSession) {
+              const cacheKey = `${this.ssoSession.firebaseApiKey}:${this.ssoSession.firebaseRefreshToken}`;
+              StorytelClient.firebaseTokenCache.delete(cacheKey);
+              const freshBearer = await this.ensureFirebaseIdToken();
+              error.config.headers = error.config.headers || {};
+              error.config.headers.Authorization = `Bearer ${freshBearer}`;
+              return await this.client.request(error.config);
+            } else if (this.savedEmail && this.savedEncryptedPassword) {
+              const cacheKey = `${this.savedEmail}:${this.savedEncryptedPassword}`;
+              StorytelClient.legacyLoginCache.delete(cacheKey);
+              await this.refreshLegacyLogin();
+              const freshBearer = this.loginData.accountInfo.jwt;
+              error.config.headers = error.config.headers || {};
+              error.config.headers.Authorization = `Bearer ${freshBearer}`;
+              return await this.client.request(error.config);
+            }
+          } catch {
+            // Ignore retry error and fall through to propagate 401
+          }
+        }
+
         // Propagate Storytel 401 as a distinct error type so Fastify routes
         // can return 401 to the frontend instead of a generic 500.
         if (error.response?.status === 401) {
@@ -236,10 +280,61 @@ class StorytelClient {
     };
   }
 
+  setCredentials(email: string, encryptedPassword: string): void {
+    this.savedEmail = email.trim();
+    this.savedEncryptedPassword = encryptedPassword.trim();
+  }
+
+  async refreshLegacyLogin(): Promise<void> {
+    if (!this.savedEmail || !this.savedEncryptedPassword) {
+      return;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const cacheKey = `${this.savedEmail}:${this.savedEncryptedPassword}`;
+    const cached = StorytelClient.legacyLoginCache.get(cacheKey);
+    if (cached && cached.expiresAt - 60 > now) {
+      this.loginData.accountInfo.jwt = cached.jwt;
+      this.loginData.accountInfo.singleSignToken = cached.singleSignToken;
+      return;
+    }
+
+    const url = "https://www.storytel.com/api/login.action";
+    const params = {
+      m: 1,
+      uid: this.savedEmail,
+      pwd: this.savedEncryptedPassword,
+    };
+
+    const response = await this.client.get<LoginData>(url, { params });
+    if (response.data?.accountInfo?.jwt) {
+      this.loginData = response.data;
+      let expiresIn = 1800; // default 30 min
+      try {
+        const parts = response.data.accountInfo.jwt.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(
+            Buffer.from(parts[1], "base64url").toString("utf-8"),
+          );
+          if (payload.exp && payload.iat) {
+            expiresIn = Math.max(300, payload.exp - payload.iat);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      StorytelClient.legacyLoginCache.set(cacheKey, {
+        jwt: response.data.accountInfo.jwt,
+        singleSignToken: response.data.accountInfo.singleSignToken,
+        expiresAt: now + expiresIn,
+      });
+    }
+  }
+
   async login(email: string, password: string): Promise<LoginData> {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
     const encryptedPassword = encryptPassword(trimmedPassword);
+    this.setCredentials(trimmedEmail, encryptedPassword);
     const url = "https://www.storytel.com/api/login.action";
     const params = {
       m: 1,
@@ -254,6 +349,29 @@ class StorytelClient {
       this.loginData = response.data;
       this.ssoSession = null;
       this.cachedFirebaseIdToken = null;
+
+      const now = Math.floor(Date.now() / 1000);
+      const cacheKey = `${trimmedEmail}:${encryptedPassword}`;
+      let expiresIn = 1800;
+      try {
+        const parts = response.data.accountInfo.jwt.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(
+            Buffer.from(parts[1], "base64url").toString("utf-8"),
+          );
+          if (payload.exp && payload.iat) {
+            expiresIn = Math.max(300, payload.exp - payload.iat);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      StorytelClient.legacyLoginCache.set(cacheKey, {
+        jwt: response.data.accountInfo.jwt,
+        singleSignToken: response.data.accountInfo.singleSignToken,
+        expiresAt: now + expiresIn,
+      });
+
       return this.loginData;
     } catch (error: any) {
       if (error.isStorytelUnauthorized) {
@@ -290,7 +408,8 @@ class StorytelClient {
       throw new Error("ensureFirebaseIdToken called outside SSO mode");
     }
     const now = Math.floor(Date.now() / 1000);
-    const cached = this.cachedFirebaseIdToken;
+    const cacheKey = `${this.ssoSession.firebaseApiKey}:${this.ssoSession.firebaseRefreshToken}`;
+    const cached = StorytelClient.firebaseTokenCache.get(cacheKey);
     if (
       cached &&
       cached.expiresAt - FIREBASE_ID_TOKEN_TTL_BUFFER_SECONDS > now
@@ -323,10 +442,10 @@ class StorytelClient {
         throw new Error("Firebase token response did not include an ID token");
       }
       const expiresIn = parseInt(response.data.expires_in, 10) || 3600;
-      this.cachedFirebaseIdToken = {
+      StorytelClient.firebaseTokenCache.set(cacheKey, {
         token: accessToken,
         expiresAt: now + expiresIn,
-      };
+      });
       return accessToken;
     } catch (error: any) {
       const status = error.response?.status;
@@ -341,10 +460,38 @@ class StorytelClient {
 
   // Bearer to send on api.storytel.net/* endpoints. SSO mode: fresh Firebase
   // ID token (auto-refreshed via the long-lived refresh token). Legacy mode:
-  // the JWT returned by login.action.
+  // the JWT returned by login.action with automatic renewal.
   private async getApiBearer(): Promise<string> {
     if (this.ssoSession) return this.ensureFirebaseIdToken();
-    return this.loginData.accountInfo.jwt;
+
+    const jwt = this.loginData.accountInfo.jwt;
+    if (jwt) {
+      try {
+        const parts = jwt.split(".");
+        if (parts.length >= 2) {
+          const payload = JSON.parse(
+            Buffer.from(parts[1], "base64url").toString("utf-8"),
+          );
+          const now = Math.floor(Date.now() / 1000);
+          if (payload.exp && payload.exp - 60 <= now) {
+            if (this.savedEmail && this.savedEncryptedPassword) {
+              await this.refreshLegacyLogin();
+              return this.loginData.accountInfo.jwt;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return jwt;
+    }
+
+    if (this.savedEmail && this.savedEncryptedPassword) {
+      await this.refreshLegacyLogin();
+      return this.loginData.accountInfo.jwt;
+    }
+
+    return "";
   }
 
   // Market country ISO code (e.g. "it", "se", "fi") carried by a Storytel JWT:

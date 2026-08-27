@@ -8,14 +8,16 @@ import fs from "fs";
 import path from "path";
 import axios from "axios";
 import { appLogger } from "./logger";
+import { encryptPassword } from "./passwordCrypt";
 
-// Extend JWT user type. Legacy (email/password) login populates storytelToken
-// and jwt; SSO login populates the sso* fields instead and leaves the legacy
-// ones empty. Email is set in both cases.
+// Extend JWT user type. Legacy (email/password) login populates storytelToken,
+// jwt, and encryptedPassword; SSO login populates the sso* fields instead and
+// leaves the legacy ones empty. Email is set in both cases.
 interface JWTUser {
   email: string;
   storytelToken: string;
   jwt: string;
+  encryptedPassword?: string;
   ssoStorytelSession?: string;
   ssoFirebaseRefreshToken?: string;
   ssoFirebaseApiKey?: string;
@@ -43,6 +45,9 @@ function hydrateStorytelClient(user: JWTUser): StorytelClient {
         jwt: user.jwt ?? "",
       },
     };
+    if (user.email && user.encryptedPassword) {
+      client.setCredentials(user.email, user.encryptedPassword);
+    }
   }
   return client;
 }
@@ -139,12 +144,14 @@ fastify.post<{
 
     const storytelClient = new StorytelClient();
     const loginData = await storytelClient.login(email, password);
+    const encPwd = encryptPassword(password.trim());
 
     // Create JWT token with storytel client data
     const token = fastify.jwt.sign({
       storytelToken: loginData.accountInfo.singleSignToken,
       jwt: loginData.accountInfo.jwt,
       email: email,
+      encryptedPassword: encPwd,
     });
 
     reply.send({ success: true, message: "Login successful", token });
