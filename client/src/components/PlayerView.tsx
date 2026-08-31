@@ -28,7 +28,39 @@ function PlayerView() {
     const audio = useAudioContext();
 
     const [fetchedBook, setFetchedBook] = useState<BookShelfEntity | null>(null);
-    const book: BookShelfEntity | null = location.state?.book || fetchedBook || audio.activeBook;
+
+    // Reset fetched book details when switching to a different book
+    useEffect(() => {
+        setFetchedBook(null);
+    }, [bookId]);
+
+    // Check if the central active book matches this route's bookId
+    const isCurrentActiveBook =
+        audio.activeBook &&
+        (String(audio.activeBookId) === String(bookId) ||
+         String(audio.activeBook.id) === String(bookId) ||
+         String(audio.activeBook.book?.consumableId) === String(bookId) ||
+         String(audio.activeBook.abook?.id) === String(bookId));
+
+    // Check if navigation state book matches this route's bookId
+    const stateBookMatches =
+        location.state?.book &&
+        (String(location.state.book.id) === String(bookId) ||
+         String(location.state.book.book?.consumableId) === String(bookId) ||
+         String(location.state.book.abook?.id) === String(bookId));
+
+    // Check if fetched fallback book matches this route's bookId
+    const fetchedBookMatches =
+        fetchedBook &&
+        (String(fetchedBook.id) === String(bookId) ||
+         String(fetchedBook.book?.consumableId) === String(bookId) ||
+         String(fetchedBook.abook?.id) === String(bookId));
+
+    const book: BookShelfEntity | null =
+        (stateBookMatches ? location.state.book : null) ||
+        (fetchedBookMatches ? fetchedBook : null) ||
+        (isCurrentActiveBook ? audio.activeBook : null);
+
     // The play buttons navigate here with `autoPlay` in the router state; opening
     // the player any other way (mini player, deep link) only loads the book.
     const autoPlayRequested = location.state?.autoPlay === true;
@@ -44,9 +76,12 @@ function PlayerView() {
 
     // Fetch fallback book details if not available
     useEffect(() => {
-        if (!location.state?.book && !audio.activeBook && bookId) {
+        const hasBookDetails = stateBookMatches || isCurrentActiveBook;
+        if (!hasBookDetails && bookId) {
+            let cancelled = false;
             api.get(`/book-details/${bookId}`)
                 .then((res) => {
+                    if (cancelled) return;
                     const data = res.data || {};
                     const formats = data.formats || [];
                     const abook = formats.find((f: any) => f.type === 'abook');
@@ -77,9 +112,17 @@ function PlayerView() {
                     };
                     setFetchedBook(entity);
                 })
-                .catch((e) => console.error("Failed to fetch fallback book details:", e));
+                .catch((e) => {
+                    if (!cancelled) {
+                        console.error("Failed to fetch fallback book details:", e);
+                    }
+                });
+
+            return () => {
+                cancelled = true;
+            };
         }
-    }, [bookId, location.state, audio.activeBook]);
+    }, [bookId, stateBookMatches, isCurrentActiveBook]);
 
     // Load book into central audio player. The play intent belongs to the
     // navigation, so it is honoured on the first run - which also resumes a book
@@ -87,12 +130,13 @@ function PlayerView() {
     // missing. A re-run (the book details arriving, say, or React invoking the
     // effect twice in development) can therefore neither swallow the intent nor
     // resume playback the user has just paused.
-    const isFirstLoadRef = useRef(true);
+    const lastBookIdRef = useRef<string | null>(null);
     useEffect(() => {
         if (bookId) {
-            const isAlreadyLoaded = audio.activeBookId === bookId && !!audio.audioSrc;
-            const autoPlay = autoPlayRequested && (isFirstLoadRef.current || !isAlreadyLoaded);
-            isFirstLoadRef.current = false;
+            const isNewBook = lastBookIdRef.current !== bookId;
+            lastBookIdRef.current = bookId;
+            const isAlreadyLoaded = audio.activeBookId === bookId && !isNewBook && !!audio.audioSrc;
+            const autoPlay = autoPlayRequested && (isNewBook || !isAlreadyLoaded);
             audio.loadBook(book, bookId, autoPlay);
         }
     }, [bookId, book, autoPlayRequested, audio.loadBook]);

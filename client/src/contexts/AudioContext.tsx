@@ -299,12 +299,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // Main book loader
   const loadBook = useCallback(
     async (book: BookShelfEntity | null, bookId: string, autoPlay: boolean = true) => {
-      const consumableId = book?.book?.consumableId || bookId;
+      const isMatchingBook =
+        book &&
+        (String(book.id) === String(bookId) ||
+         String(book.abook?.id) === String(bookId) ||
+         String(book.book?.consumableId) === String(bookId));
+      const validBook = isMatchingBook ? book : null;
+      const consumableId = validBook?.book?.consumableId || bookId;
       shouldAutoPlayRef.current = autoPlay;
 
       // If this book is already active and stream is loaded, don't restart
       if (activeBookIdRef.current === bookId && audioSrcRef.current) {
-        if (book) setActiveBook(book);
+        if (validBook) setActiveBook(validBook);
         if (autoPlay && audioRef.current && !isPlayingRef.current) {
           audioRef.current.play().catch(console.error);
         }
@@ -345,11 +351,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       storage
         .set(
           'last_played_session',
-          JSON.stringify({ book, bookId, consumableId })
+          JSON.stringify({ book: validBook, bookId, consumableId })
         )
         .catch(() => {});
 
-      const knownDurationSec = book?.abook?.time ? book.abook.time / 1000000 : 0;
+      const knownDurationSec = validBook?.abook?.time ? validBook.abook.time / 1000000 : 0;
       loadChapters(consumableId, knownDurationSec);
 
       const requestId = ++loadRequestIdRef.current;
@@ -357,7 +363,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       try {
         setIsLoading(true);
         setError(null);
-        setActiveBook(book);
+        setActiveBook(validBook);
         activeBookIdRef.current = bookId;
         activeConsumableIdRef.current = consumableId;
         setActiveBookId(bookId);
@@ -534,7 +540,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   };
 
   const onLoadedMetadata = async () => {
-    if (audioRef.current && activeConsumableId) {
+    const cid = activeConsumableIdRef.current || activeConsumableId;
+    if (audioRef.current && cid) {
       const audioDuration = audioRef.current.duration;
       if (audioDuration && !isNaN(audioDuration)) {
         setDuration(audioDuration);
@@ -545,7 +552,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           return prev;
         });
       }
-      await goToPosition(activeConsumableId);
+      await goToPosition(cid);
       setIsLoading(false);
       audioRef.current.playbackRate = playbackRate;
       if (shouldAutoPlayRef.current) {

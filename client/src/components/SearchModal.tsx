@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { SearchResultBook, SearchResponse } from '../interfaces/books';
-import { addToBookshelfErrorKey, buildCoverUrl, formatMicrosecondsTime, localizedLanguageName } from '../utils/helpers';
+import { addToBookshelfErrorKey, buildCoverUrl, formatMicrosecondsTime, localizedLanguageName, searchResultToBookEntity } from '../utils/helpers';
 import { FALLBACK_LANGUAGE } from '../config/languages';
 import { preferredCatalogLanguages } from '../config/regions';
 import { getLanguageState } from '../i18n';
@@ -240,7 +240,9 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const handlePlayBook = (e: React.MouseEvent, bookId: string) => {
     e.stopPropagation();
     onClose();
-    navigate(`/player/${bookId}`, { state: { autoPlay: true } });
+    const targetBook = results.find((b) => b.id === bookId) || null;
+    const entity = targetBook ? searchResultToBookEntity(targetBook) : null;
+    navigate(`/player/${bookId}`, { state: { book: entity, autoPlay: true } });
   };
 
   const handleViewDetails = (bookId: string) => {

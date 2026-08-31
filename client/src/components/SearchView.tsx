@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../utils/api';
 import { SearchResultBook, SearchResponse } from '../interfaces/books';
-import { addToBookshelfErrorKey, localizedLanguageName } from '../utils/helpers';
+import { addToBookshelfErrorKey, localizedLanguageName, searchResultToBookEntity } from '../utils/helpers';
 import SearchFilterRail, { DurationFilter, LanguageStat } from './SearchFilterRail';
 import SearchResultList, { SortOption } from './SearchResultList';
 import SearchPreviewPane from './SearchPreviewPane';
@@ -155,7 +155,9 @@ export function SearchView({ query: propQuery }: SearchViewProps) {
 
   const handlePlayBook = (e: React.MouseEvent | null, bookId: string) => {
     if (e) e.stopPropagation();
-    navigate(`/player/${bookId}`, { state: { autoPlay: true } });
+    const targetBook = rawResults.find((b) => b.id === bookId) || (selectedBook?.id === bookId ? selectedBook : null);
+    const entity = targetBook ? searchResultToBookEntity(targetBook) : null;
+    navigate(`/player/${bookId}`, { state: { book: entity, autoPlay: true } });
   };
 
   const handleAddToLibrary = async (e: React.MouseEvent | null, bookId: string) => {
